@@ -5,20 +5,20 @@ import { motion } from 'framer-motion';
 
 interface TrailSignProps {
   name: string;
-  position?: 'left' | 'right';
+  position?: 'top' | 'bottom';
 }
 
-export function TrailSign({ name, position = 'left' }: TrailSignProps) {
+export function TrailSign({ name, position = 'top' }: TrailSignProps) {
   return (
     <motion.div 
-      className={`flex items-center ${position === 'left' ? 'justify-start' : 'justify-end'} py-8`}
+      className={`flex flex-col ${position === 'top' ? '-mt-8' : 'mt-8'} mx-4`}
       initial={{ 
         opacity: 0, 
-        x: position === 'left' ? -50 : 50 
+        y: position === 'top' ? -30 : 30 
       }}
       whileInView={{ 
         opacity: 1, 
-        x: 0 
+        y: 0 
       }}
       viewport={{ 
         once: true,
@@ -30,13 +30,13 @@ export function TrailSign({ name, position = 'left' }: TrailSignProps) {
       }}
     >
       <motion.div 
-        className="bg-[#3d405b] text-[#f4f1de] p-4 rounded-lg shadow-lg max-w-[300px]"
+        className="bg-[#3d405b] text-[#f4f1de] p-4 rounded-lg shadow-lg w-[200px]"
         whileHover={{ 
           scale: 1.02,
           transition: { duration: 0.2 }
         }}
       >
-        <p className="font-medium text-lg">{name}</p>
+        <p className="font-medium text-lg text-center">{name}</p>
       </motion.div>
     </motion.div>
   );

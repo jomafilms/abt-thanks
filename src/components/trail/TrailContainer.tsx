@@ -9,24 +9,10 @@ interface TrailContainerProps {
 
 export function TrailContainer({ children }: TrailContainerProps) {
   return (
-    <motion.div 
-      className="relative w-full min-h-screen bg-[#f4f1de] overflow-hidden"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-    >
-      <motion.div 
-        className="absolute inset-0 overflow-y-auto scroll-smooth"
-        initial={{ y: 20 }}
-        animate={{ y: 0 }}
-        transition={{ 
-          duration: 0.8,
-          ease: "easeOut",
-          delay: 0.2
-        }}
-      >
+    <div className="relative w-full min-h-[300vh] bg-[#f4f1de]">
+      <div className="sticky top-0 h-screen w-full overflow-hidden">
         {children}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 } 
