@@ -1,4 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Above the Trees - Thank You Page
+
+A scrollable thank-you page for "Above the Trees" movie supporters, featuring names displayed along a virtual forest trail.
+
+## Project Overview
+
+### Core Features
+- Flat graphic style forest trail environment
+- Scrollable interface showing supporter names
+- Names displayed on various trail elements (signs, rocks, markers)
+- Support for 2,000+ names
+- Responsive design
+
+### Technical Stack
+- Frontend: Next.js 14, TypeScript, Tailwind CSS
+- Database: MongoDB
+- Deployment: Vercel
+- E-commerce Integration: Shopify API (planned)
 
 ## Getting Started
 
@@ -10,27 +27,57 @@ npm run dev
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Project Structure
+- `/src/app` - Main application pages and layouts
+- `/src/components` - Reusable React components
+- `/src/styles` - Global styles and Tailwind configuration
+- `/public` - Static assets and images
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Development Phases
+1. **Phase 1 - Core Implementation**
+   - Basic scrollable interface
+   - Static name display
+   - Initial forest trail design
+
+2. **Phase 2 - Dynamic Content**
+   - Database integration
+   - Dynamic name loading
+   - Improved scroll animations
+
+3. **Phase 3 - Integration & Features**
+   - Shopify API integration
+   - Email notification system
+   - Admin interface
+
+### Future Features
+1. **Music Integration**
+   - Background music player
+   - Play/pause controls
+
+2. **Automated Email Notifications**
+   - Script to generate emails when names are added
+   - Notification to customers with their marker location
+
+3. **Shopify Integration**
+   - Automatic name import from purchases
+   - Real-time updates
+
+4. **Admin Features**
+   - Name management interface
+   - Element placement tools
+   - Database management
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+To learn more about the technologies used:
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Tailwind CSS](https://tailwindcss.com/docs)
+- [TypeScript](https://www.typescriptlang.org/docs)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is configured for deployment on Vercel. Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
