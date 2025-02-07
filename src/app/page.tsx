@@ -97,7 +97,7 @@ export default function Home() {
           <div className="w-[40px] h-[40px]">
             <motion.div 
               style={{ 
-                rotate: useTransform(scrollYProgress, [0, 1], [0, 360])
+                rotate: useTransform(scrollYProgress, [0, 1], [0, 720])
               }}
             >
               <RollingStone />
