@@ -42,6 +42,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
    - Basic scrollable interface
    - Static name display
    - Initial forest trail design
+   - [ ] TODO: Implement dynamic scroll height calculation based on number of names
+     - Currently using fixed scroll height
+     - Need to calculate based on total width of all name markers
+     - Adjust translation range automatically
 
 2. **Phase 2 - Dynamic Content**
    - Database integration

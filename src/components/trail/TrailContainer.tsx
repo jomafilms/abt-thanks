@@ -9,7 +9,7 @@ interface TrailContainerProps {
 
 export function TrailContainer({ children }: TrailContainerProps) {
   return (
-    <div className="relative w-full min-h-[300vh] bg-[#f4f1de]">
+    <div className="relative w-full min-h-[800vh] bg-[#f4f1de]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         {children}
       </div>
