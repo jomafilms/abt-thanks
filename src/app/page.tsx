@@ -5,6 +5,8 @@ import { TrailContainer } from '@/components/trail/TrailContainer';
 import { TrailSign } from '@/components/trail/markers/TrailSign';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Tree } from '@/components/elements/Tree';
+import { Path } from '@/components/elements/Path';
+import { RollingStone } from '@/components/elements/RollingStone';
 
 // Sample data - this will later come from the database
 const SAMPLE_NAMES = [
@@ -43,10 +45,19 @@ const SAMPLE_NAMES = [
 
 export default function Home() {
   const { scrollYProgress } = useScroll();
+  
+  // Main content translation
   const translateX = useTransform(
     scrollYProgress,
     [0, 1],
     ['0%', '-600%']
+  );
+
+  // Path width animation
+  const pathWidth = useTransform(
+    scrollYProgress,
+    [0, 1],
+    ['10vw', '100vw']
   );
 
   // Create repeating sets of trees for each layer
@@ -67,6 +78,25 @@ export default function Home() {
         <h1 className="text-4xl font-bold text-[#3d405b] fixed top-8 left-8 z-50">
           Above the Trees
         </h1>
+
+        {/* Path Layer */}
+        <motion.div 
+          className="absolute bottom-8 left-0 z-25 px-4"
+          style={{ width: pathWidth }}
+        >
+          <Path width={2000} className="w-full" />
+        </motion.div>
+
+        {/* Rolling Stone Layer - Simplified Movement */}
+        <div className="absolute bottom-6 left-0 right-0 z-26">
+          <motion.div 
+            style={{ 
+              x: useTransform(scrollYProgress, [0, 1], [0, window.innerWidth - 60])
+            }}
+          >
+            <RollingStone />
+          </motion.div>
+        </div>
 
         {/* Background Layer (moves slowest) */}
         <motion.div 
