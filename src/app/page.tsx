@@ -88,15 +88,22 @@ export default function Home() {
         </motion.div>
 
         {/* Rolling Stone Layer - Simplified Movement */}
-        <div className="absolute bottom-6 left-0 right-0 z-26">
-          <motion.div 
-            style={{ 
-              x: useTransform(scrollYProgress, [0, 1], [0, window.innerWidth - 60])
-            }}
-          >
-            <RollingStone />
-          </motion.div>
-        </div>
+        <motion.div 
+          className="absolute bottom-12 left-0 z-26"
+          style={{ 
+            x: useTransform(scrollYProgress, [0, 1], [0, window.innerWidth - 60])
+          }}
+        >
+          <div className="w-[40px] h-[40px]">
+            <motion.div 
+              style={{ 
+                rotate: useTransform(scrollYProgress, [0, 1], [0, 360])
+              }}
+            >
+              <RollingStone />
+            </motion.div>
+          </div>
+        </motion.div>
 
         {/* Background Layer (moves slowest) */}
         <motion.div 

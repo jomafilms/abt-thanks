@@ -18,12 +18,19 @@ export const RollingStone: React.FC<RollingStoneProps> = ({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Main stone circle */}
+      {/* Drop shadow filter */}
+      <defs>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.3"/>
+        </filter>
+      </defs>
+      {/* Main stone circle with shadow */}
       <circle 
         cx={size/2} 
         cy={size/2} 
         r={size/2-2}
         fill="#8B7355"
+        filter="url(#shadow)"
       />
       {/* Add some texture/detail */}
       <path 
