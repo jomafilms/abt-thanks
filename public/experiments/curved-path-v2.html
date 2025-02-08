@@ -64,77 +64,36 @@
         const endX = width * 0.5;      // Center at top
         const endY = 0;                // Top of screen (changed from height * 0.2)
 
-        function generateControlPoints(count) {
-            const points = [
-                { x: startX, y: startY }  // Start point (yellow)
-            ];
-            
-            // Generate control points for each curve section
-            const totalHeight = startY - endY;
-            const sectionHeight = totalHeight / (count + 1);
-            
-            for (let i = 0; i < count; i++) {
-                const y = startY - sectionHeight * (i + 1);
-                const side = i % 2 === 0 ? 1 : -1;
-                const offset = 0.2;  // Consistent offset for all points
-                points.push({
-                    x: startX + (width * offset * side),
-                    y: y
-                });
-            }
-            
-            points.push({ x: endX, y: endY });  // End point at top (yellow)
-            return points;
-        }
-        
-        // Initialize control points
-        let controlPoints = generateControlPoints(2);
+        // Initialize variables
+        let controlPoints = [];
+        let initialControlPoints = [];
+        let scrollProgress = 0;
+        const MAX_SCROLL = 1000;
+        const SCROLL_SENSITIVITY = 0.5;
 
-        function updatePath() {
-            const points = controlPoints;
-            let d = `M ${points[0].x} ${points[0].y}`;
-            
-            // Create a series of connected cubic Bezier curves
-            for (let i = 0; i < points.length - 1; i++) {
-                const current = points[i];
-                const next = points[i + 1];
-                const isLast = i === points.length - 2;
-                
-                // Calculate control points for this segment
-                const dy = next.y - current.y;
-                const cp1y = current.y + dy * 0.25;
-                const cp2y = current.y + dy * 0.75;
-                
-                if (isLast) {
-                    // For the last segment, maintain the curve direction
-                    const dx = next.x - current.x;
-                    const cp1x = current.x;  // Keep first control point at current x
-                    const cp2x = current.x + dx * 0.5;  // Second control point halfway to end
-                    d += ` C ${cp1x},${cp1y},
-                           ${cp2x},${cp2y},
-                           ${next.x},${next.y}`;
-                } else {
-                    // For all other segments, use consistent outward curves
-                    d += ` C ${current.x},${cp1y},
-                           ${next.x},${cp2y},
-                           ${next.x},${next.y}`;
-                }
-            }
-            
-            path.setAttribute('d', d);
-        }
+        // Initialize control points first
+        controlPoints = generateControlPoints(2);
+        // Store initial positions
+        initialControlPoints = JSON.parse(JSON.stringify(controlPoints));
 
-        // Helper function for linear interpolation
-        function lerp(start, end, t) {
-            return start * (1 - t) + end * t;
-        }
-        
-        // Set path attributes
+        // Set path attributes and add to SVG
         path.setAttribute('class', 'path');
-        updatePath();
-        
-        // Add to SVG
         svg.appendChild(path);
+
+        // Initial render
+        updatePath();
+        updateGuideLines();
+        updateDots();
+
+        // Add wheel event listener
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            scrollProgress = Math.max(0, Math.min(scrollProgress + e.deltaY * SCROLL_SENSITIVITY, MAX_SCROLL));
+            updateControlPointsPosition();
+            updatePath();
+            updateGuideLines();
+            updateDots();
+        }, { passive: false });
 
         // Add slider functionality
         const slider = document.getElementById('pointSlider');
@@ -142,8 +101,10 @@
         
         slider.addEventListener('input', (e) => {
             const count = parseInt(e.target.value);
-            pointCount.textContent = count;  // Show actual control point count
+            pointCount.textContent = count;
+            scrollProgress = 0; // Reset scroll progress when changing points
             controlPoints = generateControlPoints(count);
+            initialControlPoints = JSON.parse(JSON.stringify(controlPoints));
             updatePath();
             updateGuideLines();
             updateDots();
@@ -239,9 +200,99 @@
             }
         });
 
-        // Initial render of guide lines and dots
-        updateGuideLines();
-        updateDots();
+        function generateControlPoints(count) {
+            const points = [
+                { x: startX, y: startY }  // Start point (yellow)
+            ];
+            
+            // Generate control points for each curve section
+            const totalHeight = startY * 0.8;
+            const sectionHeight = totalHeight / (count + 1);
+            
+            for (let i = 0; i < count; i++) {
+                const y = startY - sectionHeight * (i + 1);
+                const side = i % 2 === 0 ? 1 : -1;
+                const offset = 0.2;
+                points.push({
+                    x: startX + (width * offset * side),
+                    y: y,
+                    initialX: startX + (width * offset * side),  // Store initial positions
+                    initialY: y
+                });
+            }
+            
+            // Calculate top point position based on last control point
+            const lastControlPoint = points[points.length - 1];
+            const topPointY = Math.max(lastControlPoint.y - sectionHeight, height * 0.2);
+            points.push({ 
+                x: endX, 
+                y: topPointY,
+                initialX: endX,
+                initialY: topPointY
+            });
+            
+            return points;
+        }
+
+        function updateControlPointsPosition() {
+            // Skip first and last points (yellow dots)
+            for (let i = 1; i < controlPoints.length - 1; i++) {
+                const point = controlPoints[i];
+                const progress = Math.min(scrollProgress / MAX_SCROLL, 1);
+                
+                // Calculate how far the point should move towards the bottom point
+                const t = progress;
+                
+                // Move both x and y positions towards the bottom point while maintaining relative offset
+                const xOffset = point.initialX - startX;  // Offset from center
+                const yOffset = point.initialY - startY;  // Offset from bottom
+                
+                // As progress increases, reduce the offsets (making the curve smaller)
+                const scale = 1 - t;
+                point.x = startX + (xOffset * scale);
+                point.y = startY + (yOffset * scale);
+            }
+        }
+
+        function updatePath() {
+            const points = controlPoints;
+            let d = `M ${points[0].x} ${points[0].y}`;
+            
+            // Create a series of connected cubic Bezier curves
+            for (let i = 0; i < points.length - 1; i++) {
+                const current = points[i];
+                const next = points[i + 1];
+                const isLast = i === points.length - 2;
+                
+                // Calculate control points for this segment
+                const dy = next.y - current.y;
+                const cp1y = current.y + dy * 0.25;
+                const cp2y = current.y + dy * 0.75;
+                
+                if (isLast) {
+                    // For the last segment, create a smooth curve to top point
+                    const dx = next.x - current.x;
+                    const cp1x = current.x;
+                    // Adjust second control point based on curve direction
+                    const cp2x = current.x + dx * (dx > 0 ? 0.75 : 0.25);
+                    d += ` C ${cp1x},${cp1y},
+                           ${cp2x},${cp2y},
+                           ${next.x},${next.y}`;
+                } else {
+                    // For all other segments, use consistent outward curves
+                    d += ` C ${current.x},${cp1y},
+                           ${next.x},${cp2y},
+                           ${next.x},${next.y}`;
+                }
+            }
+            
+            path.setAttribute('d', d);
+        }
+
+        // Helper function for linear interpolation
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
     </script>
 </body>
 </html> 
