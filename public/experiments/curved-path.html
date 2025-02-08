@@ -1,93 +1,226 @@
-function createCurvedPath(width, height, offset) {
-    // Create a more natural curved path that maintains perspective
-    const startY = height;
-    const controlY1 = height * 0.7;
-    const controlY2 = height * 0.4;
-    
-    // Calculate curve based on scroll offset
-    const curvePhase = offset * Math.PI;
-    const amplitude = width * 0.15; // Reduced amplitude for gentler curves
-    const curve = Math.sin(curvePhase) * amplitude;
-    
-    // Main path points
-    const startX = width * 0.3;
-    const endX = vpX;
-    
-    return `
-        M ${startX} ${startY}
-        C ${startX + curve} ${controlY1},
-          ${endX + curve * 0.5} ${controlY2},
-          ${endX} ${vpY + bounceOffset}
-    `;
-}
-
-function createScene() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const numLines = 20;
-    
-    svg.innerHTML = '';
-    
-    // Add the ground path first
-    const groundPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    groundPath.setAttribute('d', createCurvedPath(width, height, pathOffset));
-    groundPath.setAttribute('class', 'ground-path');
-    svg.appendChild(groundPath);
-    
-    // Add horizon line
-    const horizon = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    horizon.setAttribute('x1', '0');
-    horizon.setAttribute('y1', vpY + bounceOffset);
-    horizon.setAttribute('x2', width);
-    horizon.setAttribute('y2', vpY + bounceOffset);
-    horizon.setAttribute('class', 'horizon');
-    svg.appendChild(horizon);
-    
-    // Add guide lines that follow the main path
-    for (let i = 0; i < numLines; i++) {
-        const t = i / (numLines - 1);
-        const pathWidth = width * 0.4; // Width of the path
-        const startX = width * 0.3 - pathWidth * 0.5 + pathWidth * t;
-        
-        // Calculate perspective scale (things get closer together near vanishing point)
-        const perspectiveScale = 1 - Math.pow(t, 2);
-        const curveOffset = Math.sin(pathOffset * Math.PI) * width * 0.15 * perspectiveScale;
-        
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        const d = `
-            M ${startX} ${height}
-            C ${startX + curveOffset * 0.8} ${height * 0.7},
-              ${vpX + curveOffset * 0.3} ${height * 0.4},
-              ${vpX} ${vpY + bounceOffset}
-        `;
-        
-        path.setAttribute('d', d);
-        path.setAttribute('class', 'path');
-        path.style.opacity = 0.2 + (1 - t) * 0.3;
-        svg.appendChild(path);
-
-        // Add markers that follow the path
-        for (let j = 0; j < 3; j++) {
-            const markerProgress = (progress + j * 0.3) % 1;
-            const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            
-            // Calculate position along the path with perspective
-            const p = 1 - markerProgress;
-            const pSquared = p * p;
-            
-            const x = startX + (vpX - startX) * markerProgress + 
-                     curveOffset * (1 - pSquared);
-            const y = height - (height - vpY) * markerProgress;
-            
-            // Size decreases with perspective
-            const size = 4 * (1 - markerProgress * 0.8);
-            
-            marker.setAttribute('cx', x);
-            marker.setAttribute('cy', y);
-            marker.setAttribute('r', size);
-            marker.setAttribute('class', 'marker');
-            marker.style.opacity = (1 - markerProgress) * 0.5;
-            svg.appendChild(marker);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curved Path Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
         }
-    }
-} 
+        svg {
+            width: 100vw;
+            height: 100vh;
+        }
+        .ground-path {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 12;
+            stroke-linecap: round;
+        }
+        .horizon {
+            stroke: #E9EDC9;
+            stroke-width: 1;
+            opacity: 0.3;
+        }
+        .path {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 2;
+            opacity: 0.2;
+        }
+        .marker {
+            fill: #E9EDC9;
+        }
+    </style>
+</head>
+<body>
+    <svg id="scene"></svg>
+    <script>
+        const svg = document.getElementById('scene');
+        let pathOffset = 0;
+        let progress = 0;
+        let vpX = window.innerWidth * 0.5;
+        let vpY = window.innerHeight * 0.4;
+        let bounceOffset = 0;
+
+        function createCurvedPath(width, height, offset) {
+            // Create a more natural curved path that maintains perspective
+            const startY = height;
+            const controlY1 = height * 0.7;
+            const controlY2 = height * 0.4;
+            
+            // Calculate curve based on scroll offset
+            const curvePhase = offset * Math.PI;
+            const amplitude = width * 0.15; // Reduced amplitude for gentler curves
+            const curve = Math.sin(curvePhase) * amplitude;
+            
+            // Main path points
+            const startX = width * 0.3;
+            const endX = vpX;
+            
+            // Ensure the path never goes above the vanishing point
+            const finalY = Math.max(vpY + bounceOffset, height * 0.2); // Add minimum height constraint
+            
+            return `
+                M ${startX} ${startY}
+                C ${startX + curve} ${controlY1},
+                  ${endX + curve * 0.5} ${controlY2},
+                  ${endX} ${finalY}
+            `;
+        }
+
+        function createScene() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const numLines = 20;
+            const pathBaseWidth = width * 0.25;
+            
+            svg.innerHTML = '';
+            
+            // Add horizon line
+            const horizon = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            horizon.setAttribute('x1', '0');
+            horizon.setAttribute('y1', vpY + bounceOffset);
+            horizon.setAttribute('x2', width);
+            horizon.setAttribute('y2', vpY + bounceOffset);
+            horizon.setAttribute('class', 'horizon');
+            svg.appendChild(horizon);
+            
+            // Calculate the edge paths first to use as boundaries
+            const leftEdgeX = width * 0.5 - pathBaseWidth/2;
+            const rightEdgeX = width * 0.5 + pathBaseWidth/2;
+            
+            // Only apply offset to the path when scrolling
+            const xOffset = Math.sin(pathOffset * Math.PI * 2) * width * 0.05;
+            // Start with no curve, only add curve based on scroll
+            const curveOffset = Math.sin(pathOffset * Math.PI) * width * 0.08;
+            
+            // Create left and right edge paths
+            const edgePaths = [];
+            for (let side = 0; side < 2; side++) {
+                const startX = (side === 0 ? leftEdgeX : rightEdgeX) + xOffset;
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const finalY = Math.max(vpY + bounceOffset, height * 0.2);
+                
+                // Control points now start on the straight line and curve based on scroll
+                const straightX = startX + (vpX - startX) * 0.3; // Point on straight line to vanishing point
+                const straightX2 = startX + (vpX - startX) * 0.7; // Second point on straight line
+                const cp1x = straightX + curveOffset;
+                const cp2x = straightX2 + curveOffset * 0.2;
+                
+                const d = `
+                    M ${startX} ${height}
+                    C ${cp1x} ${height * 0.7},
+                      ${cp2x} ${height * 0.4},
+                      ${vpX} ${finalY}
+                `;
+                
+                path.setAttribute('d', d);
+                path.setAttribute('class', 'path');
+                path.style.opacity = 0.5;
+                svg.appendChild(path);
+                
+                // Store control points for interpolation
+                edgePaths[side] = {
+                    startX,
+                    cp1x,
+                    cp2x,
+                    finalY
+                };
+
+                // Add dots along the edge paths
+                for (let j = 0; j < 5; j++) {
+                    // Ensure dots wrap around infinitely by taking the fractional part of progress
+                    const markerProgress = ((progress % 1 + 1) + j * 0.2) % 1;
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    
+                    const p = 1 - markerProgress;
+                    const pSquared = p * p;
+                    
+                    const markerX = startX + (vpX - startX) * markerProgress;
+                    const curveX = lerp(cp1x, cp2x, markerProgress) - markerX;
+                    const x = markerX + curveX * (1 - pSquared);
+                    const y = height - (height - finalY) * markerProgress;
+                    
+                    const size = 3 * (1 - markerProgress * 0.8);
+                    
+                    marker.setAttribute('cx', x);
+                    marker.setAttribute('cy', y);
+                    marker.setAttribute('r', size);
+                    marker.setAttribute('class', 'marker');
+                    marker.style.opacity = (1 - markerProgress) * 0.7;
+                    svg.appendChild(marker);
+                }
+            }
+            
+            // Add guide lines between the edges
+            for (let i = 1; i < numLines - 1; i++) {
+                const t = i / (numLines - 1);
+                
+                // Interpolate all points between left and right edges
+                const startX = lerp(edgePaths[0].startX, edgePaths[1].startX, t);
+                const cp1x = lerp(edgePaths[0].cp1x, edgePaths[1].cp1x, t);
+                const cp2x = lerp(edgePaths[0].cp2x, edgePaths[1].cp2x, t);
+                
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                
+                const d = `
+                    M ${startX} ${height}
+                    C ${cp1x} ${height * 0.7},
+                      ${cp2x} ${height * 0.4},
+                      ${vpX} ${edgePaths[0].finalY}
+                `;
+                
+                path.setAttribute('d', d);
+                path.setAttribute('class', 'path');
+                path.style.opacity = 0.2;
+                svg.appendChild(path);
+
+                // Add markers that follow the guide lines
+                for (let j = 0; j < 4; j++) {
+                    // Ensure dots wrap around infinitely
+                    const markerProgress = ((progress % 1 + 1) + j * 0.25) % 1;
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    
+                    const p = 1 - markerProgress;
+                    const pSquared = p * p;
+                    
+                    const markerX = startX + (vpX - startX) * markerProgress;
+                    const curveX = lerp(cp1x, cp2x, markerProgress) - markerX;
+                    const x = markerX + curveX * (1 - pSquared);
+                    const y = height - (height - edgePaths[0].finalY) * markerProgress;
+                    
+                    const size = 3 * (1 - markerProgress * 0.8);
+                    
+                    marker.setAttribute('cx', x);
+                    marker.setAttribute('cy', y);
+                    marker.setAttribute('r', size);
+                    marker.setAttribute('class', 'marker');
+                    marker.style.opacity = (1 - markerProgress) * 0.6;
+                    svg.appendChild(marker);
+                }
+            }
+        }
+
+        // Helper function for linear interpolation
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
+        // Adjust scroll sensitivity for smoother motion
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            progress -= e.deltaY * 0.0008;
+            pathOffset -= e.deltaY * 0.0004;
+            bounceOffset = Math.sin(progress * Math.PI * 2) * 1.5;
+            createScene();
+        }, { passive: false });
+
+        window.addEventListener('resize', createScene);
+        createScene();
+    </script>
+</body>
+</html> 
