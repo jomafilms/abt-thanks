@@ -118,7 +118,7 @@
     <script>
         const svg = document.getElementById('scene');
         let pathOffset = 0;
-        let progress = 0.7;  // 0.7 for 30% up the path (1 - 0.3), since 0 is bottom and 1 is vanishing point
+        let progress = 0.8;  // 0.8 for 20% up the path (1 - 0.2)
         let vpX = window.innerWidth * 0.5;
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
@@ -308,38 +308,78 @@
                 }
             });
 
-            // Add a test dot at line -3 that moves along the path
-            const dotLineNumber = -3;
-            const dotX = centerX + (dotLineNumber * BASE_LINE_SPACING);
-            const dotXOffset = dotX - centerX;
-            const dotAdjustedPerspective = adjustPerspective(dotXOffset);
-            const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
+            // Add test dots that move along the paths
+            const dots = [
+                { line: -3, startProgress: 0.5, color: 'red', type: 'circle' },     // Start at 50% up the path
+                { line: 4, startProgress: 0.8, color: '#00ff00', type: 'rectangle', name: 'Pam M' }   // Start at 20% up the path
+            ];
+            
+            dots.forEach(dot => {
+                const dotX = centerX + (dot.line * BASE_LINE_SPACING);
+                const dotXOffset = dotX - centerX;
+                const dotAdjustedPerspective = adjustPerspective(dotXOffset);
+                const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
 
-            // Calculate dot position along the path using progress
-            const markerProgress = ((progress % 1 + 1) + 0 * (1 / dotsCount)) % 1;  // Match edge dots calculation but without offset
-            const t = markerProgress;
-            const mt = 1 - t;
-            const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
-            const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
+                // Calculate dot position along the path using progress
+                let markerProgress;
+                if (progress === 0.8) {
+                    // Initial position - use startProgress
+                    markerProgress = dot.startProgress;
+                } else {
+                    // For subsequent loops, just use normal 0-100% progression
+                    markerProgress = (progress % 1 + 1) % 1;
+                }
+                const t = markerProgress;
+                const mt = 1 - t;
+                const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
+                const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
 
-            // Add debug info for dot
-            addDebugText(10, 20, `Progress: ${progress.toFixed(2)}`);
-            addDebugText(10, 40, `MarkerProgress: ${markerProgress.toFixed(2)}`);
-            addDebugText(10, 60, `Line: ${dotLineNumber}`);
-            addDebugText(dotX, height - 30, 'Line -3', 'red');
+                // Add debug info for dot
+                if (dot.line === -3) {
+                    addDebugText(10, 20, `Progress: ${progress.toFixed(2)}`);
+                    addDebugText(10, 40, `MarkerProgress: ${markerProgress.toFixed(2)}`);
+                    addDebugText(10, 60, `Line: ${dot.line}`);
+                }
+                addDebugText(dotX, height - 30, `Line ${dot.line}`, dot.color);
 
-            // Calculate size based on position (small at vanishing point, large at bottom)
-            const minSize = 2;
-            const maxSize = 16;
-            const dotSize = minSize + (maxSize - minSize) * mt;
+                // Calculate size based on position
+                const minSize = 2;
+                const maxSize = 16;
+                const baseSize = minSize + (maxSize - minSize) * mt;
 
-            // Create and position the moving dot
-            const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            testDot.setAttribute('cx', movingDotX);
-            testDot.setAttribute('cy', movingDotY);
-            testDot.setAttribute('r', dotSize);
-            testDot.setAttribute('fill', 'red');
-            svg.appendChild(testDot);
+                if (dot.type === 'circle') {
+                    // Create and position the moving dot
+                    const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    testDot.setAttribute('cx', movingDotX);
+                    testDot.setAttribute('cy', movingDotY);
+                    testDot.setAttribute('r', baseSize);
+                    testDot.setAttribute('fill', dot.color);
+                    svg.appendChild(testDot);
+                } else if (dot.type === 'rectangle') {
+                    // Create and position the moving rectangle
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    const rectWidth = baseSize * 4;  // Make rectangle wide enough for text
+                    const rectHeight = baseSize * 1.2;  // Slightly taller than before
+                    rect.setAttribute('x', movingDotX - rectWidth/2);
+                    rect.setAttribute('y', movingDotY - rectHeight/2);
+                    rect.setAttribute('width', rectWidth);
+                    rect.setAttribute('height', rectHeight);
+                    rect.setAttribute('fill', dot.color);
+                    rect.setAttribute('rx', rectHeight * 0.2); // Rounded corners
+                    svg.appendChild(rect);
+
+                    // Add name label inside rectangle
+                    const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    nameLabel.setAttribute('x', movingDotX);  // Center text in rectangle
+                    nameLabel.setAttribute('y', movingDotY + baseSize * 0.3);  // Vertically center text
+                    nameLabel.setAttribute('fill', '#000');  // Dark text for contrast
+                    nameLabel.setAttribute('font-size', `${baseSize * 0.8}px`);  // Scale font with rectangle size
+                    nameLabel.setAttribute('text-anchor', 'middle');  // Center text horizontally
+                    nameLabel.setAttribute('dominant-baseline', 'middle');  // Center text vertically
+                    nameLabel.textContent = dot.name;
+                    svg.appendChild(nameLabel);
+                }
+            });
 
             // Second pass - add edge paths and dots
             [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
