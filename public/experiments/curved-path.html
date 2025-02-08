@@ -7,8 +7,10 @@
     <style>
         body {
             margin: 0;
-            overflow: hidden;
             background: #111;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
         }
         svg {
             width: 100vw;
@@ -34,9 +36,64 @@
         .marker {
             fill: #E9EDC9;
         }
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+        .value-display {
+            font-size: 12px;
+            color: #aaa;
+            margin-left: 8px;
+        }
+        .tree {
+            fill: #4A7B42;
+            transform-origin: center bottom;
+            transition: opacity 0.3s;
+        }
     </style>
 </head>
 <body>
+    <div id="controls">
+        <div class="control-group">
+            <label>Path Width (% of screen)<span class="value-display" id="widthValue">25%</span></label>
+            <input type="range" id="pathWidth" min="10" max="50" value="25" step="1">
+        </div>
+        <div class="control-group">
+            <label>Curve Intensity<span class="value-display" id="curveValue">0.08</span></label>
+            <input type="range" id="curveIntensity" min="0" max="20" value="8" step="1">
+        </div>
+        <div class="control-group">
+            <label>Edge Dots Count<span class="value-display" id="dotsValue">10</span></label>
+            <input type="range" id="dotsCount" min="5" max="20" value="10" step="1">
+        </div>
+        <div class="control-group">
+            <label>Dot Size<span class="value-display" id="dotSizeValue">3</span></label>
+            <input type="range" id="dotSize" min="1" max="6" value="3" step="0.5">
+        </div>
+        <div class="control-group">
+            <label>Scroll Sensitivity<span class="value-display" id="scrollValue">0.0008</span></label>
+            <input type="range" id="scrollSensitivity" min="1" max="20" value="8" step="1">
+        </div>
+    </div>
     <svg id="scene"></svg>
     <script>
         const svg = document.getElementById('scene');
@@ -46,29 +103,72 @@
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
 
-        function createCurvedPath(width, height, offset) {
-            // Create a more natural curved path that maintains perspective
-            const startY = height;
-            const controlY1 = height * 0.7;
-            const controlY2 = height * 0.4;
-            
-            // Calculate curve based on scroll offset
-            const curvePhase = offset * Math.PI;
-            const amplitude = width * 0.15; // Reduced amplitude for gentler curves
-            const curve = Math.sin(curvePhase) * amplitude;
-            
-            // Main path points
-            const startX = width * 0.3;
-            const endX = vpX;
-            
-            // Ensure the path never goes above the vanishing point
-            const finalY = Math.max(vpY + bounceOffset, height * 0.2); // Add minimum height constraint
+        // Add control variables
+        let pathWidthPercent = 25;
+        let curveIntensity = 0.08;
+        let dotsCount = 10;
+        let dotBaseSize = 3;
+        let scrollSensitivity = 0.0008;
+
+        // Update control displays
+        function updateValueDisplay(id, value, suffix = '') {
+            document.getElementById(id).textContent = value + suffix;
+        }
+
+        // Add event listeners for controls
+        document.getElementById('pathWidth').addEventListener('input', (e) => {
+            pathWidthPercent = parseInt(e.target.value);
+            updateValueDisplay('widthValue', pathWidthPercent, '%');
+            createScene();
+        });
+
+        document.getElementById('curveIntensity').addEventListener('input', (e) => {
+            curveIntensity = parseInt(e.target.value) / 100;
+            updateValueDisplay('curveValue', curveIntensity);
+            createScene();
+        });
+
+        document.getElementById('dotsCount').addEventListener('input', (e) => {
+            dotsCount = parseInt(e.target.value);
+            updateValueDisplay('dotsValue', dotsCount);
+            createScene();
+        });
+
+        document.getElementById('dotSize').addEventListener('input', (e) => {
+            dotBaseSize = parseFloat(e.target.value);
+            updateValueDisplay('dotSizeValue', dotBaseSize);
+            createScene();
+        });
+
+        document.getElementById('scrollSensitivity').addEventListener('input', (e) => {
+            scrollSensitivity = parseInt(e.target.value) / 10000;
+            updateValueDisplay('scrollValue', scrollSensitivity);
+        });
+
+        // Add tree SVG path function
+        function createTreePath(size) {
+            const width = size * 0.7;
+            const height = size;
+            const triangleHeight = height - size * 0.15; // Leave space for trunk
             
             return `
-                M ${startX} ${startY}
-                C ${startX + curve} ${controlY1},
-                  ${endX + curve * 0.5} ${controlY2},
-                  ${endX} ${finalY}
+                M${width/2} 0
+                L${width*0.8} ${triangleHeight*0.3}
+                L${width*0.7} ${triangleHeight*0.3}
+                L${width*0.9} ${triangleHeight*0.6}
+                L${width*0.8} ${triangleHeight*0.6}
+                L${width} ${triangleHeight}
+                L0 ${triangleHeight}
+                L${width*0.2} ${triangleHeight*0.6}
+                L${width*0.1} ${triangleHeight*0.6}
+                L${width*0.3} ${triangleHeight*0.3}
+                L${width*0.2} ${triangleHeight*0.3}
+                Z
+                M${width/2-width*0.08} ${triangleHeight}
+                h${width*0.16}
+                v${size*0.15}
+                h-${width*0.16}
+                Z
             `;
         }
 
@@ -76,7 +176,7 @@
             const width = window.innerWidth;
             const height = window.innerHeight;
             const numLines = 20;
-            const pathBaseWidth = width * 0.25;
+            const pathBaseWidth = width * (pathWidthPercent / 100);
             
             svg.innerHTML = '';
             
@@ -95,26 +195,31 @@
             
             // Only apply offset to the path when scrolling
             const xOffset = Math.sin(pathOffset * Math.PI * 2) * width * 0.05;
-            // Start with no curve, only add curve based on scroll
-            const curveOffset = Math.sin(pathOffset * Math.PI) * width * 0.08;
+            // Use curveIntensity from controls
+            const curveOffset = Math.sin(pathOffset * Math.PI) * width * curveIntensity;
             
-            // Create left and right edge paths
-            const edgePaths = [];
+            // Calculate the center path first
+            const centerX = width * 0.5 + xOffset;
+            
+            // Center control point - centered horizontally but raised vertically
+            const centerDistanceToVP = vpX - centerX;
+            const centerControlX = centerX + centerDistanceToVP * 0.5 + curveOffset; // Halfway to VP
+            const controlY = height * 0.7; // Higher control point for concave curve
+            
+            // Create paths on either side of the center path
             for (let side = 0; side < 2; side++) {
-                const startX = (side === 0 ? leftEdgeX : rightEdgeX) + xOffset;
+                const sideOffset = (side === 0 ? -1 : 1) * pathBaseWidth/2;
+                const startX = centerX + sideOffset;
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 const finalY = Math.max(vpY + bounceOffset, height * 0.2);
                 
-                // Control points now start on the straight line and curve based on scroll
-                const straightX = startX + (vpX - startX) * 0.3; // Point on straight line to vanishing point
-                const straightX2 = startX + (vpX - startX) * 0.7; // Second point on straight line
-                const cp1x = straightX + curveOffset;
-                const cp2x = straightX2 + curveOffset * 0.2;
+                // Keep control points more centered for concave curve
+                const perspectiveScale = 0.3; // Reduced for tighter curve
+                const controlX = centerControlX + sideOffset * perspectiveScale;
                 
                 const d = `
                     M ${startX} ${height}
-                    C ${cp1x} ${height * 0.7},
-                      ${cp2x} ${height * 0.4},
+                    Q ${controlX} ${controlY},
                       ${vpX} ${finalY}
                 `;
                 
@@ -123,29 +228,18 @@
                 path.style.opacity = 0.5;
                 svg.appendChild(path);
                 
-                // Store control points for interpolation
-                edgePaths[side] = {
-                    startX,
-                    cp1x,
-                    cp2x,
-                    finalY
-                };
-
-                // Add dots along the edge paths
-                for (let j = 0; j < 5; j++) {
-                    // Ensure dots wrap around infinitely by taking the fractional part of progress
-                    const markerProgress = ((progress % 1 + 1) + j * 0.2) % 1;
+                // Add more dots along the edges
+                for (let j = 0; j < dotsCount; j++) {
+                    const markerProgress = ((progress % 1 + 1) + j * (1 / dotsCount)) % 1;
                     const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                     
-                    const p = 1 - markerProgress;
-                    const pSquared = p * p;
+                    // Calculate position along quadratic curve
+                    const t = markerProgress;
+                    const mt = 1 - t;
+                    const x = mt * mt * startX + 2 * mt * t * controlX + t * t * vpX;
+                    const y = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
                     
-                    const markerX = startX + (vpX - startX) * markerProgress;
-                    const curveX = lerp(cp1x, cp2x, markerProgress) - markerX;
-                    const x = markerX + curveX * (1 - pSquared);
-                    const y = height - (height - finalY) * markerProgress;
-                    
-                    const size = 3 * (1 - markerProgress * 0.8);
+                    const size = dotBaseSize * (1 - markerProgress * 0.8);
                     
                     marker.setAttribute('cx', x);
                     marker.setAttribute('cy', y);
@@ -161,17 +255,14 @@
                 const t = i / (numLines - 1);
                 
                 // Interpolate all points between left and right edges
-                const startX = lerp(edgePaths[0].startX, edgePaths[1].startX, t);
-                const cp1x = lerp(edgePaths[0].cp1x, edgePaths[1].cp1x, t);
-                const cp2x = lerp(edgePaths[0].cp2x, edgePaths[1].cp2x, t);
+                const startX = lerp(leftEdgeX, rightEdgeX, t);
                 
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 
                 const d = `
                     M ${startX} ${height}
-                    C ${cp1x} ${height * 0.7},
-                      ${cp2x} ${height * 0.4},
-                      ${vpX} ${edgePaths[0].finalY}
+                    Q ${controlX} ${controlY},
+                      ${vpX} ${finalY}
                 `;
                 
                 path.setAttribute('d', d);
@@ -181,17 +272,14 @@
 
                 // Add markers that follow the guide lines
                 for (let j = 0; j < 4; j++) {
-                    // Ensure dots wrap around infinitely
                     const markerProgress = ((progress % 1 + 1) + j * 0.25) % 1;
                     const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                     
-                    const p = 1 - markerProgress;
-                    const pSquared = p * p;
-                    
-                    const markerX = startX + (vpX - startX) * markerProgress;
-                    const curveX = lerp(cp1x, cp2x, markerProgress) - markerX;
-                    const x = markerX + curveX * (1 - pSquared);
-                    const y = height - (height - edgePaths[0].finalY) * markerProgress;
+                    // Calculate position along quadratic curve
+                    const p = markerProgress;
+                    const mp = 1 - p;
+                    const x = mp * mp * startX + 2 * mp * p * controlX + p * p * vpX;
+                    const y = mp * mp * height + 2 * mp * p * controlY + p * p * finalY;
                     
                     const size = 3 * (1 - markerProgress * 0.8);
                     
@@ -203,6 +291,33 @@
                     svg.appendChild(marker);
                 }
             }
+
+            // After creating the edge paths, add the tree
+            const treeProgress = ((progress % 1 + 1)) % 1;
+            if (treeProgress > 0.05) { // Show tree until almost the edge
+                const p = treeProgress;
+                const pSquared = p * p;
+                
+                // Calculate tree position along left edge path
+                const startX = leftEdgeX;
+                const markerX = startX + (vpX - startX) * treeProgress;
+                const curveX = lerp(leftEdgeX, vpX, treeProgress) - markerX;
+                const x = markerX + curveX - 60; // Moved slightly further from path
+                const y = height - (height - finalY) * treeProgress;
+                
+                // Create tree
+                const tree = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const baseSize = height * 0.15; // Much larger base size, relative to screen height
+                const scale = lerp(4, 0.2, p); // Increased maximum scale to 4x
+                const size = baseSize * scale;
+                
+                tree.setAttribute('d', createTreePath(size));
+                tree.setAttribute('class', 'tree');
+                tree.setAttribute('transform', `translate(${x - size/2} ${y - size})`);
+                tree.style.opacity = Math.min(1, treeProgress / 0.8); // Adjusted fade timing
+                
+                svg.appendChild(tree);
+            }
         }
 
         // Helper function for linear interpolation
@@ -210,11 +325,11 @@
             return start * (1 - t) + end * t;
         }
 
-        // Adjust scroll sensitivity for smoother motion
+        // Update scroll handler to use sensitivity from controls
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
-            progress -= e.deltaY * 0.0008;
-            pathOffset -= e.deltaY * 0.0004;
+            progress -= e.deltaY * scrollSensitivity;
+            pathOffset -= e.deltaY * (scrollSensitivity / 2);
             bounceOffset = Math.sin(progress * Math.PI * 2) * 1.5;
             createScene();
         }, { passive: false });
@@ -223,4 +338,4 @@
         createScene();
     </script>
 </body>
-</html> 
+</html>
