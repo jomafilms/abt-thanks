@@ -118,7 +118,7 @@
     <script>
         const svg = document.getElementById('scene');
         let pathOffset = 0;
-        let progress = 0;
+        let progress = 1;
         let vpX = window.innerWidth * 0.5;
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
@@ -194,10 +194,10 @@
             const perspectiveScale = 0.3;
 
             // Calculate viewport overflow based on horizon position
-            const horizonRatio = vpY / height; // How high the horizon is (0 = top, 1 = bottom)
-            const viewportOverflow = 2 + (1 - horizonRatio) * 2; // More overflow when horizon is higher
+            const horizonRatio = vpY / height;
+            const viewportOverflow = 2 + (1 - horizonRatio) * 2;
             const totalWidth = width * viewportOverflow;
-            const BASE_LINE_SPACING = width * 0.05; // 5% of viewport width
+            const BASE_LINE_SPACING = width * 0.05;
             const numTotalLines = Math.ceil(totalWidth / BASE_LINE_SPACING);
             
             // Calculate start position to center the lines
@@ -221,6 +221,33 @@
                 const perspectiveIntensity = 0.3 + (1 - horizonRatio) * 0.3;
                 return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
             }
+
+            // Add a test dot at line -3 that moves along the path
+            const dotLineNumber = -3;
+            const dotX = centerX + (dotLineNumber * BASE_LINE_SPACING);
+            const dotXOffset = dotX - centerX;
+            const dotAdjustedPerspective = adjustPerspective(dotXOffset);
+            const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
+
+            // Calculate dot position along the path using progress
+            const markerProgress = ((progress % 1) + 1) % 1;  // Remove the extra +1 to start at vanishing point
+            const t = markerProgress;
+            const mt = 1 - t;
+            const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
+            const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
+
+            // Calculate size based on position (small at horizon, large at bottom)
+            const minSize = 2;  // Slightly larger minimum size
+            const maxSize = 16;  // Much larger maximum size
+            const dotSize = minSize + (maxSize - minSize) * mt;  // Using mt instead of t
+
+            // Create and position the moving dot
+            const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            testDot.setAttribute('cx', movingDotX);
+            testDot.setAttribute('cy', movingDotY);
+            testDot.setAttribute('r', dotSize);
+            testDot.setAttribute('fill', 'red');
+            svg.appendChild(testDot);
 
             // Store all lines with their numbers
             const lines = [];
