@@ -197,9 +197,21 @@
             const horizonRatio = vpY / height; // How high the horizon is (0 = top, 1 = bottom)
             const viewportOverflow = 2 + (1 - horizonRatio) * 2; // More overflow when horizon is higher
             const totalWidth = width * viewportOverflow;
-            const lineSpacing = pathBaseWidth * 0.2; // Smaller spacing for more lines
-            const numTotalLines = Math.ceil(totalWidth / lineSpacing);
-            const startX = centerX - (numTotalLines * lineSpacing) / 2;
+            const BASE_LINE_SPACING = width * 0.05; // 5% of viewport width
+            const numTotalLines = Math.ceil(totalWidth / BASE_LINE_SPACING);
+            
+            // Calculate start position to center the lines
+            const startX = centerX - (totalWidth / 2);
+
+            // Calculate how many lines should be in the path based on path width
+            const pathHalfWidth = width * (pathWidthPercent / 100) / 2;
+            const linesInPathHalf = Math.ceil(pathHalfWidth / BASE_LINE_SPACING);
+
+            // Fixed edge line numbers based on path width
+            const EDGE_LINE_NUMBERS = {
+                left: -linesInPathHalf,
+                right: linesInPathHalf
+            };
 
             // Calculate perspective adjustment based on distance from center
             function adjustPerspective(xOffset) {
@@ -210,18 +222,12 @@
                 return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
             }
 
-            // Fixed edge line numbers (independent of path width)
-            const EDGE_LINE_NUMBERS = {
-                left: -3,  // Fixed left edge line number
-                right: 3   // Fixed right edge line number
-            };
-
             // Store all lines with their numbers
             const lines = [];
             
             // First pass - create all lines with their numbers
             for (let i = 0; i < numTotalLines; i++) {
-                const x = startX + i * lineSpacing;
+                const x = startX + (i * BASE_LINE_SPACING);
                 const xOffset = x - centerX;
                 const adjustedPerspective = adjustPerspective(xOffset);
                 const controlX = centerControlX + xOffset * adjustedPerspective;
