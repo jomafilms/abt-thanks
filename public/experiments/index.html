@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinite Zoom Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.0.4/pixi.min.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label>
+            Zoom Speed:
+            <input type="range" id="speed" min="0.001" max="0.01" step="0.001" value="0.005">
+        </label>
+        <br>
+        <label>
+            <input type="checkbox" id="autoZoom">
+            Auto Zoom
+        </label>
+    </div>
+    <script>
+        // Create PIXI Application
+        const app = new PIXI.Application({ 
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: 0x000000
+        });
+        document.body.appendChild(app.view);
+
+        // Create a container for our zoom elements
+        const container = new PIXI.Container();
+        app.stage.addChild(container);
+
+        // Load your image (replace with your actual image path)
+        const texture = PIXI.Texture.from('tunnel.png');
+        
+        // Create multiple sprites that we'll use for the zoom effect
+        const sprites = [];
+        const numSprites = 10; // Increased for more overlapping layers
+        
+        for (let i = 0; i < numSprites; i++) {
+            const sprite = new PIXI.Sprite(texture);
+            sprite.anchor.set(0.5);
+            sprite.x = app.screen.width / 2;
+            sprite.y = app.screen.height / 2;
+            // More gradual initial scaling
+            sprite.scale.set(0.1 + (i * 0.12));
+            // More gradual initial opacity
+            sprite.alpha = Math.max(0.1, 1 - (i * 0.12));
+            container.addChild(sprite);
+            sprites.push(sprite);
+        }
+
+        // Get control elements
+        const speedControl = document.getElementById('speed');
+        const autoZoomCheckbox = document.getElementById('autoZoom');
+        
+        // Animation variables
+        let zoomLevel = 0;
+        
+        // Handle mouse wheel zoom
+        window.addEventListener('wheel', (e) => {
+            if (!autoZoomCheckbox.checked) {
+                // Zoom in when scrolling down (positive deltaY)
+                // Zoom out when scrolling up (negative deltaY)
+                zoomLevel += e.deltaY * 0.001;
+            }
+        });
+
+        // Animation loop
+        app.ticker.add(() => {
+            if (autoZoomCheckbox.checked) {
+                zoomLevel += parseFloat(speedControl.value);
+            }
+
+            sprites.forEach((sprite, index) => {
+                // Modified scale calculation for smoother transitions
+                const baseScale = ((zoomLevel + index * 0.12) % 1);
+                const scale = 0.1 + baseScale * 1.5; // More linear scaling
+                sprite.scale.set(scale);
+                
+                // Enhanced fade effect with smoother transitions
+                // Fade out more gradually as scale increases
+                const fadeThreshold = 0.8; // Start fading earlier
+                const normalizedScale = baseScale;
+                let fadeAlpha;
+                if (normalizedScale > fadeThreshold) {
+                    // Gradually fade out as we approach the end of the cycle
+                    fadeAlpha = 1 - ((normalizedScale - fadeThreshold) / (1 - fadeThreshold));
+                } else if (normalizedScale < 0.2) {
+                    // Gradually fade in at the start
+                    fadeAlpha = normalizedScale / 0.2;
+                } else {
+                    fadeAlpha = 1;
+                }
+                sprite.alpha = Math.max(0.1, Math.min(1, fadeAlpha)) * (1 - (index * 0.05));
+            });
+        });
+
+        // Make it responsive
+        window.addEventListener('resize', () => {
+            app.renderer.resize(window.innerWidth, window.innerHeight);
+            sprites.forEach(sprite => {
+                sprite.x = app.screen.width / 2;
+                sprite.y = app.screen.height / 2;
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Perspective Test</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        svg {
+            width: 100vw;
+            height: 100vh;
+        }
+        .path {
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+        }
+        .horizon {
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 1;
+        }
+        .vanishing-point {
+            fill: red;
+            r: 3;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label>
+            Path Curve:
+            <input type="range" id="curve" min="-100" max="100" step="1" value="0">
+        </label>
+        <br>
+        <label>
+            <input type="checkbox" id="bounce" checked>
+            Walking Bounce
+        </label>
+    </div>
+    <svg id="scene">
+        <!-- Path lines will be generated here -->
+    </svg>
+    <script>
+        const svg = document.getElementById('scene');
+        const curveControl = document.getElementById('curve');
+        const bounceControl = document.getElementById('bounce');
+        
+        // Set initial vanishing point to eye level (slightly above center)
+        let vpY = window.innerHeight * 0.45; // 45% from top
+        let vpX = window.innerWidth / 2;
+        
+        function createPaths() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const numLines = 20; // Number of perspective lines
+            const curveAmount = parseInt(curveControl.value);
+            
+            // Clear previous paths
+            svg.innerHTML = '';
+            
+            // Add horizon line
+            const horizon = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            horizon.setAttribute('x1', '0');
+            horizon.setAttribute('y1', vpY);
+            horizon.setAttribute('x2', width);
+            horizon.setAttribute('y2', vpY);
+            horizon.setAttribute('class', 'horizon');
+            svg.appendChild(horizon);
+            
+            // Add vanishing point marker
+            const vp = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            vp.setAttribute('cx', vpX);
+            vp.setAttribute('cy', vpY);
+            vp.setAttribute('class', 'vanishing-point');
+            svg.appendChild(vp);
+            
+            // Create path lines
+            for (let i = 0; i < numLines; i++) {
+                const t = i / (numLines - 1);
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                
+                // Calculate control points for curved path
+                const startX = width * (0.2 + t * 0.6); // Spread lines across bottom
+                const startY = height;
+                const controlX = width / 2;
+                const controlY = height * 0.6;
+                
+                // Create curved path to vanishing point
+                const d = `M ${startX} ${startY} 
+                          Q ${controlX + curveAmount} ${controlY} ${vpX} ${vpY}`;
+                
+                path.setAttribute('d', d);
+                path.setAttribute('class', 'path');
+                path.style.opacity = 1 - t * 0.5; // Fade out distant lines
+                svg.appendChild(path);
+            }
+        }
+        
+        // Add walking bounce animation
+        let time = 0;
+        function animate() {
+            if (bounceControl.checked) {
+                time += 0.05;
+                vpY = window.innerHeight * 0.45 + Math.sin(time) * 5; // Subtle 5px bounce
+                createPaths();
+            }
+            requestAnimationFrame(animate);
+        }
+        
+        // Initialize and handle updates
+        createPaths();
+        animate();
+        
+        // Handle window resize
+        window.addEventListener('resize', createPaths);
+        
+        // Handle curve control changes
+        curveControl.addEventListener('input', createPaths);
+    </script>
+</body>
+</html> 

@@ -60,6 +60,13 @@ export default function Home() {
     ['10vw', '100vw']
   );
 
+  // Background image parallax
+  const bgX = useTransform(
+    scrollYProgress,
+    [0, 1],
+    ['0%', '-50%']
+  );
+
   // Create repeating sets of trees for each layer
   const createTreeSet = (count: number, props: any) => (
     <>
@@ -75,6 +82,25 @@ export default function Home() {
   return (
     <TrailContainer>
       <div className="h-screen flex flex-col justify-center bg-[#f4f1de] relative overflow-hidden">
+        {/* Static Background Color */}
+        <div className="absolute inset-0 bg-[#f4f1de]" />
+
+        {/* Repeating Background Image Layer */}
+        <motion.div 
+          className="absolute inset-0 z-0"
+          style={{ x: bgX }}
+        >
+          <div 
+            className="h-full w-[400vw]" 
+            style={{
+              backgroundImage: 'url(/images/trees-bg1.png)',
+              backgroundRepeat: 'repeat-x',
+              backgroundSize: 'auto 100%',
+              opacity: 0.4
+            }}
+          />
+        </motion.div>
+
         <h1 className="text-4xl font-bold text-[#3d405b] fixed top-8 left-8 z-50">
           Above the Trees
         </h1>
@@ -114,14 +140,16 @@ export default function Home() {
             {/* Original set */}
             {createTreeSet(30, {
               size: "large",
-              color: "#2A4B32",
-              className: "opacity-30 mx-12 transform -translate-y-20 shrink-0"
+              color: "#1D3B4A",
+              variant: "pine",
+              className: "opacity-80 mx-12 transform -translate-y-20 shrink-0"
             })}
             {/* Repeated set */}
             {createTreeSet(30, {
               size: "large",
-              color: "#2A4B32",
-              className: "opacity-30 mx-12 transform -translate-y-20 shrink-0"
+              color: "#1D3B4A",
+              variant: "pine",
+              className: "opacity-80 mx-12 transform -translate-y-20 shrink-0"
             })}
           </div>
         </motion.div>
@@ -135,19 +163,22 @@ export default function Home() {
             {/* Original set */}
             {createTreeSet(35, {
               size: "medium",
-              color: "#3A6B42",
+              color: "#2A9D8F",
+              variant: "round",
               className: "mx-10 shrink-0"
             })}
             {/* Repeated set */}
             {createTreeSet(35, {
               size: "medium",
-              color: "#3A6B42",
+              color: "#2A9D8F",
+              variant: "slim",
               className: "mx-10 shrink-0"
             })}
             {/* Extra set for longer scroll */}
             {createTreeSet(35, {
               size: "medium",
-              color: "#3A6B42",
+              color: "#2A9D8F",
+              variant: "round",
               className: "mx-10 shrink-0"
             })}
           </div>
@@ -162,24 +193,28 @@ export default function Home() {
             {/* Original set */}
             {createTreeSet(25, {
               size: "small",
-              color: "#4A8B52",
+              color: "#64C2A6",
+              variant: "slim",
               className: "mx-8 transform translate-y-20 shrink-0"
             })}
             {/* Repeated sets */}
             {createTreeSet(25, {
               size: "small",
-              color: "#4A8B52",
+              color: "#64C2A6",
+              variant: "round",
               className: "mx-8 transform translate-y-20 shrink-0"
             })}
             {/* Extra sets for longer scroll */}
             {createTreeSet(25, {
               size: "small",
-              color: "#4A8B52",
+              color: "#64C2A6",
+              variant: "slim",
               className: "mx-8 transform translate-y-20 shrink-0"
             })}
             {createTreeSet(25, {
               size: "small",
-              color: "#4A8B52",
+              color: "#64C2A6",
+              variant: "round",
               className: "mx-8 transform translate-y-20 shrink-0"
             })}
           </div>

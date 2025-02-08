@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Motion Test</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: black;
+            min-height: 100vh;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        #scroll-space {
+            height: 300vh;
+            position: relative;
+            z-index: 0;
+        }
+        .path {
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+        }
+        .horizon {
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 1;
+        }
+        .vanishing-point {
+            fill: red;
+            r: 3;
+        }
+        .marker {
+            fill: white;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label>
+            Scroll Sensitivity:
+            <input type="range" id="speed" min="0.1" max="2" step="0.1" value="1">
+        </label>
+    </div>
+    <svg id="scene">
+        <!-- Path lines and markers will be generated here -->
+    </svg>
+    <script>
+        const svg = document.getElementById('scene');
+        const speedControl = document.getElementById('speed');
+        
+        // Set initial vanishing point to eye level (slightly above center)
+        let vpY = window.innerHeight * 0.45; // 45% from top
+        let vpX = window.innerWidth / 2;
+        
+        // Motion variables
+        let progress = 0;
+        let lastScrollY = 0;
+        let isScrolling = false;
+        let bounceOffset = 0;
+        let lastScrollTime = 0;
+        let scrollSpeed = 0;
+        let lastWheelEvent = null;
+        
+        // Bounce animation
+        function updateBounce() {
+            const currentTime = Date.now();
+            
+            if (isScrolling && lastWheelEvent) {
+                // Calculate bounce based on scroll speed and direction
+                const scrollIntensity = Math.min(Math.abs(lastWheelEvent.deltaY) / 100, 1);
+                const direction = lastWheelEvent.deltaY > 0 ? 1 : -1;
+                scrollSpeed = scrollIntensity * direction;
+            } else {
+                // Quickly decay scroll speed when not scrolling
+                scrollSpeed *= 0.85;
+            }
+            
+            if (Math.abs(scrollSpeed) > 0.01) {
+                // Active bounce with speed influence
+                bounceOffset = Math.sin(currentTime * 0.015) * scrollSpeed * 1.5; // Reduced amplitude, faster frequency
+            } else {
+                bounceOffset = 0;
+                scrollSpeed = 0;
+            }
+            
+            // Only redraw if there's active bouncing
+            if (Math.abs(bounceOffset) > 0.01) {
+                createScene();
+            }
+            requestAnimationFrame(updateBounce);
+        }
+        
+        function createScene() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const numLines = 20; // Number of perspective lines
+            
+            // Clear previous elements
+            svg.innerHTML = '';
+            
+            // Add horizon line with bounce
+            const horizon = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            horizon.setAttribute('x1', '0');
+            horizon.setAttribute('y1', vpY + bounceOffset);
+            horizon.setAttribute('x2', width);
+            horizon.setAttribute('y2', vpY + bounceOffset);
+            horizon.setAttribute('class', 'horizon');
+            svg.appendChild(horizon);
+            
+            // Add vanishing point marker with bounce
+            const vp = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            vp.setAttribute('cx', vpX);
+            vp.setAttribute('cy', vpY + bounceOffset);
+            vp.setAttribute('class', 'vanishing-point');
+            svg.appendChild(vp);
+            
+            // Create path lines with motion markers
+            for (let i = 0; i < numLines; i++) {
+                const t = i / (numLines - 1);
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                
+                // Calculate points for straight path to vanishing point
+                const startX = width * (0.2 + t * 0.6); // Spread lines across bottom
+                const startY = height;
+                
+                // Create path to vanishing point with bounce
+                const d = `M ${startX} ${startY} L ${vpX} ${vpY + bounceOffset}`;
+                
+                path.setAttribute('d', d);
+                path.setAttribute('class', 'path');
+                path.style.opacity = 1 - t * 0.5; // Fade out distant lines
+                svg.appendChild(path);
+
+                // Add motion markers along the path
+                for (let j = 0; j < 3; j++) {
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    const markerProgress = (progress + j * 0.3) % 1;
+                    // Adjust marker position for bounce
+                    const x = startX + (vpX - startX) * markerProgress;
+                    const y = startY + ((vpY + bounceOffset) - startY) * markerProgress;
+                    const size = 4 * (1 - markerProgress); // Markers get smaller as they approach VP
+                    
+                    marker.setAttribute('cx', x);
+                    marker.setAttribute('cy', y);
+                    marker.setAttribute('r', size);
+                    marker.setAttribute('class', 'marker');
+                    marker.style.opacity = (1 - markerProgress) * 0.5;
+                    svg.appendChild(marker);
+                }
+            }
+        }
+
+        // Handle wheel event for infinite scroll
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const sensitivity = parseFloat(speedControl.value);
+            progress += e.deltaY * 0.001 * sensitivity;
+            
+            // Update scroll state
+            isScrolling = true;
+            lastScrollTime = Date.now();
+            lastWheelEvent = e;
+            
+            // Set a timeout to detect when scrolling stops
+            clearTimeout(window.scrollTimeout);
+            window.scrollTimeout = setTimeout(() => {
+                isScrolling = false;
+                lastWheelEvent = null;
+            }, 50); // Shorter timeout for more responsive stop detection
+            
+            createScene();
+        }, { passive: false });
+        
+        // Handle window resize
+        window.addEventListener('resize', createScene);
+        
+        // Initial setup
+        createScene();
+        updateBounce();
+
+        // Remove scroll-space div and prevent default scrolling
+        document.body.style.overflow = 'hidden';
+        document.getElementById('scroll-space')?.remove();
+    </script>
+</body>
+</html> 
