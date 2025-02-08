@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curved Path V2</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        svg {
+            width: 100vw;
+            height: 100vh;
+        }
+        .path {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 2;
+            stroke-linecap: round;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-family: sans-serif;
+        }
+        #controls label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        #controls input {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label>Number of Control Points: <span id="pointCount">2</span></label>
+        <input type="range" id="pointSlider" min="1" max="4" value="2" step="1">
+    </div>
+    <svg id="scene">
+        <!-- We'll draw a single curved line from bottom to top -->
+    </svg>
+
+    <script>
+        // Get viewport dimensions
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        
+        // Create the path
+        const svg = document.getElementById('scene');
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        
+        // Calculate points for a smooth curve path
+        const startX = width * 0.5;    // Center at bottom
+        const startY = height;         // Bottom of screen
+        const endX = width * 0.5;      // Center at top
+        const endY = 0;                // Top of screen (changed from height * 0.2)
+
+        function generateControlPoints(count) {
+            const points = [
+                { x: startX, y: startY }  // Start point (yellow)
+            ];
+            
+            // Generate control points for each curve section
+            const totalHeight = startY - endY;
+            const sectionHeight = totalHeight / (count + 1);
+            
+            for (let i = 0; i < count; i++) {
+                const y = startY - sectionHeight * (i + 1);
+                const side = i % 2 === 0 ? 1 : -1;
+                const offset = 0.2;  // Consistent offset for all points
+                points.push({
+                    x: startX + (width * offset * side),
+                    y: y
+                });
+            }
+            
+            points.push({ x: endX, y: endY });  // End point at top (yellow)
+            return points;
+        }
+        
+        // Initialize control points
+        let controlPoints = generateControlPoints(2);
+
+        function updatePath() {
+            const points = controlPoints;
+            let d = `M ${points[0].x} ${points[0].y}`;
+            
+            // Create a series of connected cubic Bezier curves
+            for (let i = 0; i < points.length - 1; i++) {
+                const current = points[i];
+                const next = points[i + 1];
+                const isLast = i === points.length - 2;
+                
+                // Calculate control points for this segment
+                const dy = next.y - current.y;
+                const cp1y = current.y + dy * 0.25;
+                const cp2y = current.y + dy * 0.75;
+                
+                if (isLast) {
+                    // For the last segment, maintain the curve direction
+                    const dx = next.x - current.x;
+                    const cp1x = current.x;  // Keep first control point at current x
+                    const cp2x = current.x + dx * 0.5;  // Second control point halfway to end
+                    d += ` C ${cp1x},${cp1y},
+                           ${cp2x},${cp2y},
+                           ${next.x},${next.y}`;
+                } else {
+                    // For all other segments, use consistent outward curves
+                    d += ` C ${current.x},${cp1y},
+                           ${next.x},${cp2y},
+                           ${next.x},${next.y}`;
+                }
+            }
+            
+            path.setAttribute('d', d);
+        }
+
+        // Helper function for linear interpolation
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+        
+        // Set path attributes
+        path.setAttribute('class', 'path');
+        updatePath();
+        
+        // Add to SVG
+        svg.appendChild(path);
+
+        // Add slider functionality
+        const slider = document.getElementById('pointSlider');
+        const pointCount = document.getElementById('pointCount');
+        
+        slider.addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            pointCount.textContent = count;  // Show actual control point count
+            controlPoints = generateControlPoints(count);
+            updatePath();
+            updateGuideLines();
+            updateDots();
+        });
+
+        // Add guide lines and dots with dragging functionality
+        let isDragging = false;
+        let dragPoint = null;
+
+        function createGuideLine(point1, point2) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute('x1', point1.x);
+            line.setAttribute('y1', point1.y);
+            line.setAttribute('x2', point2.x);
+            line.setAttribute('y2', point2.y);
+            line.setAttribute('stroke', '#666');
+            line.setAttribute('stroke-width', '1');
+            return line;
+        }
+
+        function updateGuideLines() {
+            // Remove old guide lines
+            const oldLines = svg.querySelectorAll('.guide-line');
+            oldLines.forEach(line => line.remove());
+
+            // Add new guide lines
+            for (let i = 0; i < controlPoints.length - 1; i++) {
+                const line = createGuideLine(controlPoints[i], controlPoints[i + 1]);
+                line.classList.add('guide-line');
+                svg.appendChild(line);
+            }
+        }
+
+        function createDot(point, index) {
+            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            const isEndpoint = index === 0 || index === controlPoints.length - 1;
+            
+            dot.setAttribute('cx', point.x);
+            dot.setAttribute('cy', point.y);
+            dot.setAttribute('r', '6');
+            dot.setAttribute('fill', isEndpoint ? 'yellow' : 'red');
+            
+            if (!isEndpoint) {
+                dot.style.cursor = 'move';
+                dot.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    dragPoint = index;
+                    dot.setAttribute('r', '8');
+                });
+            }
+            
+            return dot;
+        }
+
+        function updateDots() {
+            // Remove old dots
+            const oldDots = svg.querySelectorAll('.control-dot');
+            oldDots.forEach(dot => dot.remove());
+
+            // Add new dots
+            controlPoints.forEach((point, i) => {
+                const dot = createDot(point, i);
+                dot.classList.add('control-dot');
+                svg.appendChild(dot);
+            });
+        }
+
+        // Add mouse event listeners to SVG
+        svg.addEventListener('mousemove', (e) => {
+            if (isDragging && dragPoint !== null) {
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Update control point position
+                controlPoints[dragPoint].x = x;
+                controlPoints[dragPoint].y = y;
+                
+                // Update path and visual elements
+                updatePath();
+                updateGuideLines();
+                updateDots();
+            }
+        });
+
+        svg.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                dragPoint = null;
+                // Reset dot sizes
+                const dots = svg.querySelectorAll('.control-dot');
+                dots.forEach(dot => dot.setAttribute('r', '6'));
+            }
+        });
+
+        // Initial render of guide lines and dots
+        updateGuideLines();
+        updateDots();
+    </script>
+</body>
+</html> 
