@@ -33,6 +33,18 @@
             stroke-width: 2;
             opacity: 0.2;
         }
+        .path-edge {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 2;
+            opacity: 0.5;
+        }
+        .path-center {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 1;
+            opacity: 0.5;
+        }
         .marker {
             fill: #E9EDC9;
         }
@@ -207,6 +219,7 @@
             const controlY = height * 0.7; // Higher control point for concave curve
             
             // Create paths on either side of the center path
+            const edgePaths = [];
             for (let side = 0; side < 2; side++) {
                 const sideOffset = (side === 0 ? -1 : 1) * pathBaseWidth/2;
                 const startX = centerX + sideOffset;
@@ -224,11 +237,17 @@
                 `;
                 
                 path.setAttribute('d', d);
-                path.setAttribute('class', 'path');
-                path.style.opacity = 0.5;
+                path.setAttribute('class', 'path-edge');
                 svg.appendChild(path);
+
+                // Store path info for center lines
+                edgePaths[side] = {
+                    startX,
+                    controlX,
+                    finalY
+                };
                 
-                // Add more dots along the edges
+                // Add dots along the edges
                 for (let j = 0; j < dotsCount; j++) {
                     const markerProgress = ((progress % 1 + 1) + j * (1 / dotsCount)) % 1;
                     const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -254,67 +273,65 @@
             for (let i = 1; i < numLines - 1; i++) {
                 const t = i / (numLines - 1);
                 
-                // Interpolate all points between left and right edges
-                const startX = lerp(leftEdgeX, rightEdgeX, t);
+                // Interpolate between the edge paths
+                const startX = lerp(edgePaths[0].startX, edgePaths[1].startX, t);
+                const controlX = lerp(edgePaths[0].controlX, edgePaths[1].controlX, t);
                 
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 
                 const d = `
                     M ${startX} ${height}
                     Q ${controlX} ${controlY},
-                      ${vpX} ${finalY}
+                      ${vpX} ${edgePaths[0].finalY}
                 `;
                 
                 path.setAttribute('d', d);
-                path.setAttribute('class', 'path');
-                path.style.opacity = 0.2;
+                path.setAttribute('class', 'path-center');
                 svg.appendChild(path);
 
-                // Add markers that follow the guide lines
-                for (let j = 0; j < 4; j++) {
-                    const markerProgress = ((progress % 1 + 1) + j * 0.25) % 1;
-                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    
-                    // Calculate position along quadratic curve
-                    const p = markerProgress;
-                    const mp = 1 - p;
-                    const x = mp * mp * startX + 2 * mp * p * controlX + p * p * vpX;
-                    const y = mp * mp * height + 2 * mp * p * controlY + p * p * finalY;
-                    
-                    const size = 3 * (1 - markerProgress * 0.8);
-                    
-                    marker.setAttribute('cx', x);
-                    marker.setAttribute('cy', y);
-                    marker.setAttribute('r', size);
-                    marker.setAttribute('class', 'marker');
-                    marker.style.opacity = (1 - markerProgress) * 0.6;
-                    svg.appendChild(marker);
+                // Add markers that follow the guide lines (but only on every 4th line)
+                if (i % 4 === 0) {
+                    for (let j = 0; j < 4; j++) {
+                        const markerProgress = ((progress % 1 + 1) + j * 0.25) % 1;
+                        const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        
+                        // Calculate position along quadratic curve
+                        const p = markerProgress;
+                        const mp = 1 - p;
+                        const x = mp * mp * startX + 2 * mp * p * controlX + p * p * vpX;
+                        const y = mp * mp * height + 2 * mp * p * controlY + p * p * edgePaths[0].finalY;
+                        
+                        const size = 2 * (1 - markerProgress * 0.8);
+                        
+                        marker.setAttribute('cx', x);
+                        marker.setAttribute('cy', y);
+                        marker.setAttribute('r', size);
+                        marker.setAttribute('class', 'marker');
+                        marker.style.opacity = (1 - markerProgress) * 0.4;
+                        svg.appendChild(marker);
+                    }
                 }
             }
 
-            // After creating the edge paths, add the tree
+            // After creating the paths, add the tree
             const treeProgress = ((progress % 1 + 1)) % 1;
-            if (treeProgress > 0.05) { // Show tree until almost the edge
+            if (treeProgress > 0.05) {
                 const p = treeProgress;
-                const pSquared = p * p;
                 
-                // Calculate tree position along left edge path
-                const startX = leftEdgeX;
-                const markerX = startX + (vpX - startX) * treeProgress;
-                const curveX = lerp(leftEdgeX, vpX, treeProgress) - markerX;
-                const x = markerX + curveX - 60; // Moved slightly further from path
-                const y = height - (height - finalY) * treeProgress;
+                // Use the left edge path for tree positioning
+                const treeX = lerp(edgePaths[0].startX, vpX, p);
+                const treeY = lerp(height, edgePaths[0].finalY, p);
                 
                 // Create tree
                 const tree = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                const baseSize = height * 0.15; // Much larger base size, relative to screen height
-                const scale = lerp(4, 0.2, p); // Increased maximum scale to 4x
+                const baseSize = height * 0.15;
+                const scale = lerp(4, 0.2, p);
                 const size = baseSize * scale;
                 
                 tree.setAttribute('d', createTreePath(size));
                 tree.setAttribute('class', 'tree');
-                tree.setAttribute('transform', `translate(${x - size/2} ${y - size})`);
-                tree.style.opacity = Math.min(1, treeProgress / 0.8); // Adjusted fade timing
+                tree.setAttribute('transform', `translate(${treeX - size/2} ${treeY - size})`);
+                tree.style.opacity = Math.min(1, treeProgress / 0.8);
                 
                 svg.appendChild(tree);
             }
