@@ -130,6 +130,7 @@
         let dotBaseSize = 3;
         let scrollSensitivity = 0.0008;
         let numLines = 40;
+        const NUM_LATITUDE_LINES = 10;  // Number of horizontal grid lines
 
         // Add debug text function
         function addDebugText(x, y, text, color = 'white') {
@@ -231,6 +232,32 @@
                 // Use horizonRatio to adjust perspective intensity
                 const perspectiveIntensity = 0.3 + (1 - horizonRatio) * 0.3;
                 return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
+            }
+
+            // Add latitude lines
+            for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
+                const lat_t = i / NUM_LATITUDE_LINES;
+                const lat_mt = 1 - lat_t;
+                const y = lat_t * lat_t * finalY + 2 * lat_t * lat_mt * controlY + lat_mt * lat_mt * height;
+                
+                // Create latitude line
+                const latitudeLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                latitudeLine.setAttribute('x1', centerX - pathHalfWidth * 1.5);
+                latitudeLine.setAttribute('y1', y);
+                latitudeLine.setAttribute('x2', centerX + pathHalfWidth * 1.5);
+                latitudeLine.setAttribute('y2', y);
+                latitudeLine.setAttribute('stroke', 'rgba(255, 255, 255, 0.2)');
+                latitudeLine.setAttribute('stroke-width', '1');
+                latitudeLine.setAttribute('stroke-dasharray', '4 4');
+                svg.appendChild(latitudeLine);
+                
+                // Add latitude label
+                addDebugText(
+                    centerX + pathHalfWidth * 1.6, 
+                    y, 
+                    `${((1 - lat_t) * 100).toFixed(0)}%`,  // Invert percentage so 0% is at horizon
+                    'rgba(255, 255, 255, 0.5)'
+                );
             }
 
             // Store all lines with their numbers
