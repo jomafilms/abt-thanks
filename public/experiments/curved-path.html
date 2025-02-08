@@ -118,10 +118,11 @@
     <script>
         const svg = document.getElementById('scene');
         let pathOffset = 0;
-        let progress = 0.8;  // 0.8 for 20% up the path (1 - 0.2)
+        let baseProgress = 0.8;  // Base progress for the whole scene
         let vpX = window.innerWidth * 0.5;
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
+        let hasStarted = false;  // Track if animation has started
 
         // Add control variables
         let pathWidthPercent = 25;
@@ -177,6 +178,18 @@
             scrollSensitivity = parseInt(e.target.value) / 10000;
             updateValueDisplay('scrollValue', scrollSensitivity);
         });
+
+        // Function to calculate a dot's progress
+        function calculateDotProgress(dot) {
+            if (!hasStarted) {
+                return dot.startProgress;
+            }
+            // Handle both positive and negative progress values
+            const progressDelta = baseProgress - 0.8;
+            const rawProgress = dot.startProgress + progressDelta;
+            // Ensure positive modulo for negative numbers
+            return ((rawProgress % 1) + 1) % 1;
+        }
 
         function createScene() {
             const width = window.innerWidth;
@@ -321,14 +334,7 @@
                 const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
 
                 // Calculate dot position along the path using progress
-                let markerProgress;
-                if (progress === 0.8) {
-                    // Initial position - use startProgress
-                    markerProgress = dot.startProgress;
-                } else {
-                    // For subsequent loops, just use normal 0-100% progression
-                    markerProgress = (progress % 1 + 1) % 1;
-                }
+                const markerProgress = calculateDotProgress(dot);
                 const t = markerProgress;
                 const mt = 1 - t;
                 const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
@@ -336,7 +342,7 @@
 
                 // Add debug info for dot
                 if (dot.line === -3) {
-                    addDebugText(10, 20, `Progress: ${progress.toFixed(2)}`);
+                    addDebugText(10, 20, `Progress: ${baseProgress.toFixed(2)}`);
                     addDebugText(10, 40, `MarkerProgress: ${markerProgress.toFixed(2)}`);
                     addDebugText(10, 60, `Line: ${dot.line}`);
                 }
@@ -381,7 +387,7 @@
                 }
             });
 
-            // Second pass - add edge paths and dots
+            // Second pass - add edge paths only
             [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
                 const edgeLine = lines.find(line => line.number === edgeNum);
                 if (!edgeLine) return;
@@ -390,26 +396,6 @@
                 edgePath.setAttribute('d', edgeLine.d);
                 edgePath.setAttribute('class', 'path-edge');
                 svg.appendChild(edgePath);
-
-                // Add dots along the edge
-                for (let j = 0; j < dotsCount; j++) {
-                    const markerProgress = ((progress % 1 + 1) + j * (1 / dotsCount)) % 1;
-                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    
-                    const t = markerProgress;
-                    const mt = 1 - t;
-                    const dotX = mt * mt * edgeLine.x + 2 * mt * t * edgeLine.controlX + t * t * vpX;
-                    const dotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
-                    
-                    const size = dotBaseSize * (1 - markerProgress * 0.8);
-                    
-                    marker.setAttribute('cx', dotX);
-                    marker.setAttribute('cy', dotY);
-                    marker.setAttribute('r', size);
-                    marker.setAttribute('class', 'marker');
-                    marker.style.opacity = (1 - markerProgress) * 0.7;
-                    svg.appendChild(marker);
-                }
             });
         }
 
@@ -421,9 +407,10 @@
         // Update scroll handler to use sensitivity from controls
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
-            progress -= e.deltaY * scrollSensitivity;
+            if (!hasStarted) hasStarted = true;
+            baseProgress -= e.deltaY * scrollSensitivity;
             pathOffset -= e.deltaY * (scrollSensitivity / 2);
-            bounceOffset = Math.sin(progress * Math.PI * 2) * 1.5;
+            bounceOffset = Math.sin(baseProgress * Math.PI * 2) * 1.5;
             createScene();
         }, { passive: false });
 
