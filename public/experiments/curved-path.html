@@ -316,14 +316,15 @@
             const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
 
             // Calculate dot position along the path using progress
-            const t = progress % 1;  // t=1 is at vanishing point, t=0 is at bottom
+            const markerProgress = ((progress % 1 + 1) + 0 * (1 / dotsCount)) % 1;  // Match edge dots calculation but without offset
+            const t = markerProgress;
             const mt = 1 - t;
-            const movingDotX = t * t * vpX + 2 * t * mt * dotControlX + mt * mt * dotX;
-            const movingDotY = t * t * finalY + 2 * t * mt * controlY + mt * mt * height;
+            const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
+            const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
 
             // Add debug info for dot
             addDebugText(10, 20, `Progress: ${progress.toFixed(2)}`);
-            addDebugText(10, 40, `t: ${t.toFixed(2)}`);
+            addDebugText(10, 40, `MarkerProgress: ${markerProgress.toFixed(2)}`);
             addDebugText(10, 60, `Line: ${dotLineNumber}`);
             addDebugText(dotX, height - 30, 'Line -3', 'red');
 
