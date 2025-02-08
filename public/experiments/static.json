@@ -1,0 +1,68 @@
+{
+    "markers": [
+        {
+            "id": "start-marker",
+            "line": -3,
+            "startProgress": 0.5,
+            "color": "red",
+            "type": "circle",
+            "description": "Starting point marker",
+            "canReceiveName": false
+        },
+        {
+            "id": "end-marker",
+            "line": -5,
+            "startProgress": 0.7,
+            "color": "#f542aa",
+            "type": "circle",
+            "description": "Ending point marker",
+            "canReceiveName": false
+        },
+        {
+            "id": "name-marker-1",
+            "line": 4,
+            "startProgress": 0.8,
+            "color": "#00ff00",
+            "type": "rectangle",
+            "description": "First available name slot",
+            "canReceiveName": true,
+            "name": null,
+            "order": 1
+        },
+        {
+            "id": "name-marker-2",
+            "line": 2,
+            "startProgress": 0.3,
+            "color": "#4287f5",
+            "type": "rectangle",
+            "description": "Second available name slot",
+            "canReceiveName": true,
+            "name": null,
+            "order": 2
+        },
+        {
+            "id": "name-marker-3",
+            "line": 6,
+            "startProgress": 0.4,
+            "color": "#f5a142",
+            "type": "rectangle",
+            "description": "Third available name slot",
+            "canReceiveName": true,
+            "name": null,
+            "order": 3
+        }
+    ],
+    "config": {
+        "circles": {
+            "defaultSize": 3,
+            "minSize": 2,
+            "maxSize": 16
+        },
+        "rectangles": {
+            "defaultWidth": 4,
+            "defaultHeight": 1.2,
+            "cornerRadius": 0.2,
+            "fontScale": 0.8
+        }
+    }
+} 

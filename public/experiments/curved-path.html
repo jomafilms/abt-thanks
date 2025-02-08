@@ -102,14 +102,6 @@
             <input type="range" id="curveIntensity" min="0" max="20" value="8" step="1">
         </div>
         <div class="control-group">
-            <label>Edge Dots Count<span class="value-display" id="dotsValue">10</span></label>
-            <input type="range" id="dotsCount" min="5" max="20" value="10" step="1">
-        </div>
-        <div class="control-group">
-            <label>Dot Size<span class="value-display" id="dotSizeValue">3</span></label>
-            <input type="range" id="dotSize" min="1" max="6" value="3" step="0.5">
-        </div>
-        <div class="control-group">
             <label>Scroll Sensitivity<span class="value-display" id="scrollValue">0.0008</span></label>
             <input type="range" id="scrollSensitivity" min="1" max="20" value="8" step="1">
         </div>
@@ -127,11 +119,40 @@
         // Add control variables
         let pathWidthPercent = 25;
         let curveIntensity = 0.08;
-        let dotsCount = 10;
-        let dotBaseSize = 3;
         let scrollSensitivity = 0.0008;
         let numLines = 40;
         const NUM_LATITUDE_LINES = 10;  // Number of horizontal grid lines
+
+        // Load configuration and markers
+        let staticConfig = null;
+        let markersWithNames = [];
+
+        // Function to load and merge configuration
+        async function loadConfiguration() {
+            try {
+                // Load static configuration
+                const staticResponse = await fetch('static.json');
+                staticConfig = await staticResponse.json();
+
+                // Load names (this will be replaced with API call later)
+                const namesResponse = await fetch('names.json');
+                const namesData = await namesResponse.json();
+
+                // Assign names to available markers
+                markersWithNames = staticConfig.markers.map(marker => {
+                    if (marker.canReceiveName && namesData.names.length > 0) {
+                        const nextName = namesData.names.shift();
+                        return { ...marker, name: nextName.name };
+                    }
+                    return marker;
+                });
+
+                // Initial scene creation
+                createScene();
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+            }
+        }
 
         // Add debug text function
         function addDebugText(x, y, text, color = 'white') {
@@ -162,18 +183,6 @@
             createScene();
         });
 
-        document.getElementById('dotsCount').addEventListener('input', (e) => {
-            dotsCount = parseInt(e.target.value);
-            updateValueDisplay('dotsValue', dotsCount);
-            createScene();
-        });
-
-        document.getElementById('dotSize').addEventListener('input', (e) => {
-            dotBaseSize = parseFloat(e.target.value);
-            updateValueDisplay('dotSizeValue', dotBaseSize);
-            createScene();
-        });
-
         document.getElementById('scrollSensitivity').addEventListener('input', (e) => {
             scrollSensitivity = parseInt(e.target.value) / 10000;
             updateValueDisplay('scrollValue', scrollSensitivity);
@@ -192,6 +201,8 @@
         }
 
         function createScene() {
+            if (!staticConfig) return; // Wait for configuration to load
+
             const width = window.innerWidth;
             const height = window.innerHeight;
             const pathBaseWidth = width * (pathWidthPercent / 100);
@@ -321,68 +332,64 @@
                 }
             });
 
-            // Add test dots that move along the paths
-            const dots = [
-                { line: -3, startProgress: 0.5, color: 'red', type: 'circle' },     // Start at 50% up the path
-                { line: 4, startProgress: 0.8, color: '#00ff00', type: 'rectangle', name: 'Pam M' }   // Start at 20% up the path
-            ];
-            
-            dots.forEach(dot => {
-                const dotX = centerX + (dot.line * BASE_LINE_SPACING);
+            // Use markersWithNames instead of hardcoded MARKERS_CONFIG
+            markersWithNames.forEach(marker => {
+                const dotX = centerX + (marker.line * BASE_LINE_SPACING);
                 const dotXOffset = dotX - centerX;
                 const dotAdjustedPerspective = adjustPerspective(dotXOffset);
                 const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
 
-                // Calculate dot position along the path using progress
-                const markerProgress = calculateDotProgress(dot);
+                // Calculate marker position along the path using progress
+                const markerProgress = calculateDotProgress(marker);
                 const t = markerProgress;
                 const mt = 1 - t;
                 const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
                 const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
 
-                // Add debug info for dot
-                if (dot.line === -3) {
+                // Add debug info for specific markers
+                if (marker.id === 'start-marker') {
                     addDebugText(10, 20, `Progress: ${baseProgress.toFixed(2)}`);
                     addDebugText(10, 40, `MarkerProgress: ${markerProgress.toFixed(2)}`);
-                    addDebugText(10, 60, `Line: ${dot.line}`);
+                    addDebugText(10, 60, `Line: ${marker.line}`);
                 }
-                addDebugText(dotX, height - 30, `Line ${dot.line}`, dot.color);
+                addDebugText(dotX, height - 30, `Line ${marker.line}`, marker.color);
 
-                // Calculate size based on position
-                const minSize = 2;
-                const maxSize = 16;
+                // Calculate size based on position and configuration
+                const config = marker.type === 'circle' ? staticConfig.config.circles : staticConfig.config.rectangles;
+                const minSize = config.minSize || 2;
+                const maxSize = config.maxSize || 16;
                 const baseSize = minSize + (maxSize - minSize) * mt;
 
-                if (dot.type === 'circle') {
+                if (marker.type === 'circle') {
                     // Create and position the moving dot
                     const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                     testDot.setAttribute('cx', movingDotX);
                     testDot.setAttribute('cy', movingDotY);
                     testDot.setAttribute('r', baseSize);
-                    testDot.setAttribute('fill', dot.color);
+                    testDot.setAttribute('fill', marker.color);
                     svg.appendChild(testDot);
-                } else if (dot.type === 'rectangle') {
+                } else if (marker.type === 'rectangle' && marker.name) {
                     // Create and position the moving rectangle
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    const rectWidth = baseSize * 4;  // Make rectangle wide enough for text
-                    const rectHeight = baseSize * 1.2;  // Slightly taller than before
+                    const rectWidth = baseSize * config.defaultWidth;
+                    const rectHeight = baseSize * config.defaultHeight;
                     rect.setAttribute('x', movingDotX - rectWidth/2);
                     rect.setAttribute('y', movingDotY - rectHeight/2);
                     rect.setAttribute('width', rectWidth);
                     rect.setAttribute('height', rectHeight);
-                    rect.setAttribute('fill', dot.color);
-                    rect.setAttribute('rx', rectHeight * 0.2); // Rounded corners
+                    rect.setAttribute('fill', marker.color);
+                    rect.setAttribute('rx', rectHeight * config.cornerRadius);
                     svg.appendChild(rect);
 
                     // Add name label inside rectangle
                     const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    nameLabel.setAttribute('x', movingDotX);  // Center text in rectangle
-                    nameLabel.setAttribute('y', movingDotY + baseSize * 0.3);  // Vertically center text
-                    nameLabel.setAttribute('fill', '#000');  // Dark text for contrast
-                    nameLabel.setAttribute('font-size', `${baseSize * 0.8}px`);  // Scale font with rectangle size
-                    nameLabel.setAttribute('text-anchor', 'middle');  // Center text horizontally
-                    nameLabel.setAttribute('dominant-baseline', 'middle');  // Center text vertically
-                    nameLabel.textContent = dot.name;
+                    nameLabel.setAttribute('x', movingDotX);
+                    nameLabel.setAttribute('y', movingDotY + baseSize * 0.3);
+                    nameLabel.setAttribute('fill', '#000');
+                    nameLabel.setAttribute('font-size', `${baseSize * config.fontScale}px`);
+                    nameLabel.setAttribute('text-anchor', 'middle');
+                    nameLabel.setAttribute('dominant-baseline', 'middle');
+                    nameLabel.textContent = marker.name;
                     svg.appendChild(nameLabel);
                 }
             });
@@ -415,7 +422,9 @@
         }, { passive: false });
 
         window.addEventListener('resize', createScene);
-        createScene();
+
+        // Initialize
+        loadConfiguration();
     </script>
 </body>
 </html>
