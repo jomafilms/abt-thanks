@@ -118,7 +118,7 @@
     <script>
         const svg = document.getElementById('scene');
         let pathOffset = 0;
-        let progress = 1;
+        let progress = 1;  // Start at vanishing point
         let vpX = window.innerWidth * 0.5;
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
@@ -129,7 +129,18 @@
         let dotsCount = 10;
         let dotBaseSize = 3;
         let scrollSensitivity = 0.0008;
-        let numLines = 40; // Increased number of lines
+        let numLines = 40;
+
+        // Add debug text function
+        function addDebugText(x, y, text, color = 'white') {
+            const debugText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            debugText.setAttribute('x', x);
+            debugText.setAttribute('y', y);
+            debugText.setAttribute('fill', color);
+            debugText.setAttribute('font-size', '12px');
+            debugText.textContent = text;
+            svg.appendChild(debugText);
+        }
 
         // Update control displays
         function updateValueDisplay(id, value, suffix = '') {
@@ -222,33 +233,6 @@
                 return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
             }
 
-            // Add a test dot at line -3 that moves along the path
-            const dotLineNumber = -3;
-            const dotX = centerX + (dotLineNumber * BASE_LINE_SPACING);
-            const dotXOffset = dotX - centerX;
-            const dotAdjustedPerspective = adjustPerspective(dotXOffset);
-            const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
-
-            // Calculate dot position along the path using progress
-            const markerProgress = ((progress % 1) + 1) % 1;  // Remove the extra +1 to start at vanishing point
-            const t = markerProgress;
-            const mt = 1 - t;
-            const movingDotX = mt * mt * dotX + 2 * mt * t * dotControlX + t * t * vpX;
-            const movingDotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
-
-            // Calculate size based on position (small at horizon, large at bottom)
-            const minSize = 2;  // Slightly larger minimum size
-            const maxSize = 16;  // Much larger maximum size
-            const dotSize = minSize + (maxSize - minSize) * mt;  // Using mt instead of t
-
-            // Create and position the moving dot
-            const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            testDot.setAttribute('cx', movingDotX);
-            testDot.setAttribute('cy', movingDotY);
-            testDot.setAttribute('r', dotSize);
-            testDot.setAttribute('fill', 'red');
-            svg.appendChild(testDot);
-
             // Store all lines with their numbers
             const lines = [];
             
@@ -289,6 +273,45 @@
                     isInMainPath
                 });
             }
+
+            // Add line number labels at bottom
+            lines.forEach(line => {
+                if (line.number % 5 === 0) {  // Show every 5th line number
+                    addDebugText(line.x, height - 10, line.number.toString());
+                }
+            });
+
+            // Add a test dot at line -3 that moves along the path
+            const dotLineNumber = -3;
+            const dotX = centerX + (dotLineNumber * BASE_LINE_SPACING);
+            const dotXOffset = dotX - centerX;
+            const dotAdjustedPerspective = adjustPerspective(dotXOffset);
+            const dotControlX = centerControlX + dotXOffset * dotAdjustedPerspective;
+
+            // Calculate dot position along the path using progress
+            const t = progress % 1;  // t=1 is at vanishing point, t=0 is at bottom
+            const mt = 1 - t;
+            const movingDotX = t * t * vpX + 2 * t * mt * dotControlX + mt * mt * dotX;
+            const movingDotY = t * t * finalY + 2 * t * mt * controlY + mt * mt * height;
+
+            // Add debug info for dot
+            addDebugText(10, 20, `Progress: ${progress.toFixed(2)}`);
+            addDebugText(10, 40, `t: ${t.toFixed(2)}`);
+            addDebugText(10, 60, `Line: ${dotLineNumber}`);
+            addDebugText(dotX, height - 30, 'Line -3', 'red');
+
+            // Calculate size based on position (small at vanishing point, large at bottom)
+            const minSize = 2;
+            const maxSize = 16;
+            const dotSize = minSize + (maxSize - minSize) * mt;
+
+            // Create and position the moving dot
+            const testDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            testDot.setAttribute('cx', movingDotX);
+            testDot.setAttribute('cy', movingDotY);
+            testDot.setAttribute('r', dotSize);
+            testDot.setAttribute('fill', 'red');
+            svg.appendChild(testDot);
 
             // Second pass - add edge paths and dots
             [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
