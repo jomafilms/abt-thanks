@@ -118,7 +118,7 @@
     <script>
         const svg = document.getElementById('scene');
         let pathOffset = 0;
-        let progress = 1;  // Start at vanishing point
+        let progress = 0.7;  // 0.7 for 30% up the path (1 - 0.3), since 0 is bottom and 1 is vanishing point
         let vpX = window.innerWidth * 0.5;
         let vpY = window.innerHeight * 0.4;
         let bounceOffset = 0;
