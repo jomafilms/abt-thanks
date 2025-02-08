@@ -3,24 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swirling Paths Art</title>
+    <title>AI Swirl Art - Interactive Path Visualization</title>
     <style>
         body { 
             margin: 0; 
             background: #111;
             min-height: 100vh;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
         #controls {
             position: fixed;
             top: 20px;
-            left: 20px;
+            right: 20px;
+            left: auto;
             color: white;
-            font-family: Arial, sans-serif;
             background: rgba(0,0,0,0.7);
             padding: 15px;
             border-radius: 8px;
             z-index: 100;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 200px;
         }
         .control-group {
             margin: 10px 0;
@@ -31,38 +35,141 @@
             left: 0;
             width: 100vw;
             height: 100vh;
+            cursor: crosshair;
         }
         .path {
             fill: none;
             stroke-width: 2;
             transition: stroke 0.3s;
         }
+        .info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            z-index: 100;
+        }
+        select, input[type="range"] {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+            width: 150px;
+        }
+        select {
+            width: 162px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .preset-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+            transition: all 0.3s;
+        }
+        .preset-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #mouse-trail {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        /* Toggle switch styling */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .4s;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
     </style>
 </head>
 <body>
     <div id="controls">
-        <div class="control-group">
-            <label>
-                Speed:
-                <input type="range" id="speed" min="0.1" max="2" step="0.1" value="1">
+        <h3 style="margin-top: 0; color: #fff; text-align: center;">AI Swirl Art</h3>
+        <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
+            <label>Auto-Play:</label>
+            <label class="switch">
+                <input type="checkbox" id="autoPlay" checked>
+                <span class="slider"></span>
             </label>
         </div>
         <div class="control-group">
-            <label>
-                Swirl Intensity:
-                <input type="range" id="swirl" min="0.1" max="2" step="0.1" value="1">
-            </label>
+            <label>Animation Speed:</label>
+            <input type="range" id="speed" min="0.1" max="2" step="0.1" value="1">
         </div>
         <div class="control-group">
-            <label>
-                Color Mode:
-                <select id="colorMode">
-                    <option value="rainbow">Rainbow</option>
-                    <option value="monochrome">Monochrome</option>
-                    <option value="complementary">Complementary</option>
-                </select>
-            </label>
+            <label>Swirl Intensity:</label>
+            <input type="range" id="swirl" min="0.1" max="2" step="0.1" value="1">
         </div>
+        <div class="control-group">
+            <label>Line Count:</label>
+            <input type="range" id="lineCount" min="20" max="100" step="1" value="40">
+        </div>
+        <div class="control-group">
+            <label>Color Mode:</label>
+            <select id="colorMode">
+                <option value="rainbow">Rainbow Wave</option>
+                <option value="monochrome">Deep Ocean</option>
+                <option value="complementary">Yin Yang</option>
+                <option value="sunset">Digital Sunset</option>
+                <option value="matrix">Matrix</option>
+                <option value="aurora">Aurora</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Presets:</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                <button class="preset-btn" data-preset="cosmic">Cosmic</button>
+                <button class="preset-btn" data-preset="zen">Zen</button>
+                <button class="preset-btn" data-preset="cyber">Cyber</button>
+            </div>
+        </div>
+    </div>
+    <div class="info">
+        Click anywhere to toggle animation • Mouse move to influence paths • Scroll to control flow
     </div>
     <svg id="scene"></svg>
     <script>
@@ -70,12 +177,37 @@
         const speedControl = document.getElementById('speed');
         const swirlControl = document.getElementById('swirl');
         const colorMode = document.getElementById('colorMode');
+        const lineCountControl = document.getElementById('lineCount');
         
-        let vpY = window.innerHeight * 0.5;
+        let vpY = window.innerHeight * 0.6;
         let vpX = window.innerWidth * 0.5;
         let progress = 0;
         let pathOffset = 0;
         let autoAnimate = true;
+        let mouseX = vpX;
+        let mouseY = vpY;
+
+        // Presets configuration
+        const presets = {
+            cosmic: {
+                speed: 1.5,
+                swirl: 1.8,
+                lineCount: 60,
+                colorMode: 'rainbow'
+            },
+            zen: {
+                speed: 0.5,
+                swirl: 0.8,
+                lineCount: 30,
+                colorMode: 'monochrome'
+            },
+            cyber: {
+                speed: 1.2,
+                swirl: 1.5,
+                lineCount: 80,
+                colorMode: 'matrix'
+            }
+        };
 
         function hslToString(h, s, l) {
             return `hsl(${h}, ${s}%, ${l}%)`;
@@ -91,21 +223,40 @@
                     const baseHue = (progress * 100) % 360;
                     const hue = t < 0.5 ? baseHue : (baseHue + 180) % 360;
                     return hslToString(hue, 70, 60);
+                case 'sunset':
+                    const sunsetHue = t < 0.5 ? 
+                        lerp(0, 45, t * 2) : // Red to orange
+                        lerp(45, 280, (t - 0.5) * 2); // Orange to purple
+                    return hslToString(sunsetHue, 80, 60);
+                case 'matrix':
+                    return hslToString(120, 100, 40 + Math.sin(progress + t * 10) * 20);
+                case 'aurora':
+                    const auroraHue = lerp(120, 200, Math.sin(progress * 2 + t * 4) * 0.5 + 0.5);
+                    return hslToString(auroraHue, 70, 60);
                 default:
                     return 'white';
             }
+        }
+
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
         }
 
         function createSwirlPath(width, height, t, offset, swirlIntensity) {
             const startX = width * (0.1 + t * 0.8);
             const startY = height;
             
-            // Create multiple control points for more complex swirling
-            const cp1x = startX + Math.sin(offset * Math.PI * 2 + t * Math.PI) * width * 0.2 * swirlIntensity;
-            const cp1y = height * 0.7;
+            // Mouse influence
+            const mouseInfluence = 0.3;
+            const dx = (mouseX - vpX) * mouseInfluence;
+            const dy = (mouseY - vpY) * mouseInfluence;
             
-            const cp2x = vpX + Math.sin((offset + t) * Math.PI * 2) * width * 0.3 * swirlIntensity;
-            const cp2y = height * 0.4;
+            // Create multiple control points for more complex swirling
+            const cp1x = startX + Math.sin(offset * Math.PI * 2 + t * Math.PI) * width * 0.2 * swirlIntensity + dx * t;
+            const cp1y = height * 0.7 + dy * t;
+            
+            const cp2x = vpX + Math.sin((offset + t) * Math.PI * 2) * width * 0.3 * swirlIntensity + dx * (1-t);
+            const cp2y = height * 0.4 + dy * (1-t);
             
             const cp3x = vpX + Math.cos(offset * Math.PI * 3 + t * Math.PI) * width * 0.1 * swirlIntensity;
             const cp3y = height * 0.2;
@@ -122,7 +273,7 @@
         function createScene() {
             const width = window.innerWidth;
             const height = window.innerHeight;
-            const numLines = 40; // More lines for more complex patterns
+            const numLines = parseInt(lineCountControl.value);
             
             svg.innerHTML = '';
             
@@ -159,15 +310,45 @@
             createScene();
         }, { passive: false });
 
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (!autoAnimate) {
+                createScene();
+            }
+        });
+
         window.addEventListener('resize', createScene);
         
-        [speedControl, swirlControl, colorMode].forEach(control => {
-            control.addEventListener('change', createScene);
+        [speedControl, swirlControl, colorMode, lineCountControl].forEach(control => {
+            control.addEventListener('input', createScene);
+        });
+
+        // Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = presets[btn.dataset.preset];
+                speedControl.value = preset.speed;
+                swirlControl.value = preset.swirl;
+                lineCountControl.value = preset.lineCount;
+                colorMode.value = preset.colorMode;
+                createScene();
+            });
         });
 
         // Toggle animation on click
-        document.addEventListener('click', () => {
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('preset-btn') || 
+                e.target.classList.contains('slider') || 
+                e.target.type === 'checkbox') return;
             autoAnimate = !autoAnimate;
+            autoPlayCheckbox.checked = autoAnimate;
+        });
+
+        // Update auto-play checkbox
+        const autoPlayCheckbox = document.getElementById('autoPlay');
+        autoPlayCheckbox.addEventListener('change', () => {
+            autoAnimate = autoPlayCheckbox.checked;
         });
 
         createScene();
