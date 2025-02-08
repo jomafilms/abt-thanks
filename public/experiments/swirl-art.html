@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swirling Paths Art</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #111;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        #scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        .path {
+            fill: none;
+            stroke-width: 2;
+            transition: stroke 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div class="control-group">
+            <label>
+                Speed:
+                <input type="range" id="speed" min="0.1" max="2" step="0.1" value="1">
+            </label>
+        </div>
+        <div class="control-group">
+            <label>
+                Swirl Intensity:
+                <input type="range" id="swirl" min="0.1" max="2" step="0.1" value="1">
+            </label>
+        </div>
+        <div class="control-group">
+            <label>
+                Color Mode:
+                <select id="colorMode">
+                    <option value="rainbow">Rainbow</option>
+                    <option value="monochrome">Monochrome</option>
+                    <option value="complementary">Complementary</option>
+                </select>
+            </label>
+        </div>
+    </div>
+    <svg id="scene"></svg>
+    <script>
+        const svg = document.getElementById('scene');
+        const speedControl = document.getElementById('speed');
+        const swirlControl = document.getElementById('swirl');
+        const colorMode = document.getElementById('colorMode');
+        
+        let vpY = window.innerHeight * 0.5;
+        let vpX = window.innerWidth * 0.5;
+        let progress = 0;
+        let pathOffset = 0;
+        let autoAnimate = true;
+
+        function hslToString(h, s, l) {
+            return `hsl(${h}, ${s}%, ${l}%)`;
+        }
+
+        function getPathColor(t, mode) {
+            switch(mode) {
+                case 'rainbow':
+                    return hslToString((t * 360 + progress * 100) % 360, 70, 60);
+                case 'monochrome':
+                    return hslToString(220, 70, 40 + t * 40);
+                case 'complementary':
+                    const baseHue = (progress * 100) % 360;
+                    const hue = t < 0.5 ? baseHue : (baseHue + 180) % 360;
+                    return hslToString(hue, 70, 60);
+                default:
+                    return 'white';
+            }
+        }
+
+        function createSwirlPath(width, height, t, offset, swirlIntensity) {
+            const startX = width * (0.1 + t * 0.8);
+            const startY = height;
+            
+            // Create multiple control points for more complex swirling
+            const cp1x = startX + Math.sin(offset * Math.PI * 2 + t * Math.PI) * width * 0.2 * swirlIntensity;
+            const cp1y = height * 0.7;
+            
+            const cp2x = vpX + Math.sin((offset + t) * Math.PI * 2) * width * 0.3 * swirlIntensity;
+            const cp2y = height * 0.4;
+            
+            const cp3x = vpX + Math.cos(offset * Math.PI * 3 + t * Math.PI) * width * 0.1 * swirlIntensity;
+            const cp3y = height * 0.2;
+
+            return `
+                M ${startX} ${startY}
+                C ${cp1x} ${cp1y},
+                  ${cp2x} ${cp2y},
+                  ${cp3x} ${cp3y}
+                L ${vpX} ${vpY}
+            `;
+        }
+
+        function createScene() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const numLines = 40; // More lines for more complex patterns
+            
+            svg.innerHTML = '';
+            
+            // Create swirling paths
+            for (let i = 0; i < numLines; i++) {
+                const t = i / (numLines - 1);
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                
+                const swirlIntensity = parseFloat(swirlControl.value);
+                path.setAttribute('d', createSwirlPath(width, height, t, pathOffset, swirlIntensity));
+                path.setAttribute('class', 'path');
+                path.style.stroke = getPathColor(t, colorMode.value);
+                path.style.opacity = 0.5 + Math.sin(t * Math.PI) * 0.3;
+                svg.appendChild(path);
+            }
+        }
+
+        function animate() {
+            if (autoAnimate) {
+                const speed = parseFloat(speedControl.value);
+                progress += 0.01 * speed;
+                pathOffset += 0.005 * speed;
+                createScene();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // Event Listeners
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const speed = parseFloat(speedControl.value);
+            progress += e.deltaY * 0.001 * speed;
+            pathOffset += e.deltaY * 0.0005 * speed;
+            createScene();
+        }, { passive: false });
+
+        window.addEventListener('resize', createScene);
+        
+        [speedControl, swirlControl, colorMode].forEach(control => {
+            control.addEventListener('change', createScene);
+        });
+
+        // Toggle animation on click
+        document.addEventListener('click', () => {
+            autoAnimate = !autoAnimate;
+        });
+
+        createScene();
+        animate();
+    </script>
+</body>
+</html> 

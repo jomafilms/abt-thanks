@@ -1,0 +1,93 @@
+function createCurvedPath(width, height, offset) {
+    // Create a more natural curved path that maintains perspective
+    const startY = height;
+    const controlY1 = height * 0.7;
+    const controlY2 = height * 0.4;
+    
+    // Calculate curve based on scroll offset
+    const curvePhase = offset * Math.PI;
+    const amplitude = width * 0.15; // Reduced amplitude for gentler curves
+    const curve = Math.sin(curvePhase) * amplitude;
+    
+    // Main path points
+    const startX = width * 0.3;
+    const endX = vpX;
+    
+    return `
+        M ${startX} ${startY}
+        C ${startX + curve} ${controlY1},
+          ${endX + curve * 0.5} ${controlY2},
+          ${endX} ${vpY + bounceOffset}
+    `;
+}
+
+function createScene() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const numLines = 20;
+    
+    svg.innerHTML = '';
+    
+    // Add the ground path first
+    const groundPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    groundPath.setAttribute('d', createCurvedPath(width, height, pathOffset));
+    groundPath.setAttribute('class', 'ground-path');
+    svg.appendChild(groundPath);
+    
+    // Add horizon line
+    const horizon = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    horizon.setAttribute('x1', '0');
+    horizon.setAttribute('y1', vpY + bounceOffset);
+    horizon.setAttribute('x2', width);
+    horizon.setAttribute('y2', vpY + bounceOffset);
+    horizon.setAttribute('class', 'horizon');
+    svg.appendChild(horizon);
+    
+    // Add guide lines that follow the main path
+    for (let i = 0; i < numLines; i++) {
+        const t = i / (numLines - 1);
+        const pathWidth = width * 0.4; // Width of the path
+        const startX = width * 0.3 - pathWidth * 0.5 + pathWidth * t;
+        
+        // Calculate perspective scale (things get closer together near vanishing point)
+        const perspectiveScale = 1 - Math.pow(t, 2);
+        const curveOffset = Math.sin(pathOffset * Math.PI) * width * 0.15 * perspectiveScale;
+        
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const d = `
+            M ${startX} ${height}
+            C ${startX + curveOffset * 0.8} ${height * 0.7},
+              ${vpX + curveOffset * 0.3} ${height * 0.4},
+              ${vpX} ${vpY + bounceOffset}
+        `;
+        
+        path.setAttribute('d', d);
+        path.setAttribute('class', 'path');
+        path.style.opacity = 0.2 + (1 - t) * 0.3;
+        svg.appendChild(path);
+
+        // Add markers that follow the path
+        for (let j = 0; j < 3; j++) {
+            const markerProgress = (progress + j * 0.3) % 1;
+            const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            
+            // Calculate position along the path with perspective
+            const p = 1 - markerProgress;
+            const pSquared = p * p;
+            
+            const x = startX + (vpX - startX) * markerProgress + 
+                     curveOffset * (1 - pSquared);
+            const y = height - (height - vpY) * markerProgress;
+            
+            // Size decreases with perspective
+            const size = 4 * (1 - markerProgress * 0.8);
+            
+            marker.setAttribute('cx', x);
+            marker.setAttribute('cy', y);
+            marker.setAttribute('r', size);
+            marker.setAttribute('class', 'marker');
+            marker.style.opacity = (1 - markerProgress) * 0.5;
+            svg.appendChild(marker);
+        }
+    }
+} 
