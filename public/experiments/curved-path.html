@@ -193,18 +193,46 @@
             const finalY = Math.max(vpY + bounceOffset, height * 0.2);
             const perspectiveScale = 0.3;
 
-            // Draw all lines first (from viewport edge to edge)
-            const totalWidth = width; // Use full viewport width
-            const lineSpacing = pathBaseWidth * 0.25; // Smaller spacing between lines
+            // Calculate viewport overflow based on horizon position
+            const horizonRatio = vpY / height; // How high the horizon is (0 = top, 1 = bottom)
+            const viewportOverflow = 2 + (1 - horizonRatio) * 2; // More overflow when horizon is higher
+            const totalWidth = width * viewportOverflow;
+            const lineSpacing = pathBaseWidth * 0.2; // Smaller spacing for more lines
             const numTotalLines = Math.ceil(totalWidth / lineSpacing);
             const startX = centerX - (numTotalLines * lineSpacing) / 2;
 
-            // Draw all lines
+            // Calculate perspective adjustment based on distance from center
+            function adjustPerspective(xOffset) {
+                // Calculate perspective scale based on distance from center
+                const distanceRatio = Math.abs(xOffset) / (width/2);
+                // Use horizonRatio to adjust perspective intensity
+                const perspectiveIntensity = 0.3 + (1 - horizonRatio) * 0.3;
+                return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
+            }
+
+            // Fixed edge line numbers (independent of path width)
+            const EDGE_LINE_NUMBERS = {
+                left: -3,  // Fixed left edge line number
+                right: 3   // Fixed right edge line number
+            };
+
+            // Store all lines with their numbers
+            const lines = [];
+            
+            // First pass - create all lines with their numbers
             for (let i = 0; i < numTotalLines; i++) {
                 const x = startX + i * lineSpacing;
                 const xOffset = x - centerX;
-                const controlX = centerControlX + xOffset * perspectiveScale;
+                const adjustedPerspective = adjustPerspective(xOffset);
+                const controlX = centerControlX + xOffset * adjustedPerspective;
 
+                // Skip if the line would start way outside viewport
+                if (x < -width * (viewportOverflow - 1) || x > width * viewportOverflow) continue;
+
+                // Calculate line number based on index from center
+                const centerIndex = Math.floor(numTotalLines / 2);
+                const lineNumber = i - centerIndex;
+                
                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 const d = `
                     M ${x} ${height}
@@ -213,41 +241,52 @@
                 `;
                 
                 // Determine if this is within the main path boundaries
-                const pathHalfWidth = pathBaseWidth / 2;
-                const isInMainPath = Math.abs(xOffset) <= pathHalfWidth;
+                const isInMainPath = Math.abs(lineNumber) < EDGE_LINE_NUMBERS.right; // Use line numbers for path coloring
                 
                 path.setAttribute('d', d);
                 path.setAttribute('class', isInMainPath ? 'path-center' : 'path-grid');
                 svg.appendChild(path);
 
-                // Add edge paths on top
-                if (Math.abs(Math.abs(xOffset) - pathHalfWidth) < lineSpacing/2) {
-                    const edgePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    edgePath.setAttribute('d', d);
-                    edgePath.setAttribute('class', 'path-edge');
-                    svg.appendChild(edgePath);
-
-                    // Add dots along the edges
-                    for (let j = 0; j < dotsCount; j++) {
-                        const markerProgress = ((progress % 1 + 1) + j * (1 / dotsCount)) % 1;
-                        const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                        
-                        const t = markerProgress;
-                        const mt = 1 - t;
-                        const dotX = mt * mt * x + 2 * mt * t * controlX + t * t * vpX;
-                        const dotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
-                        
-                        const size = dotBaseSize * (1 - markerProgress * 0.8);
-                        
-                        marker.setAttribute('cx', dotX);
-                        marker.setAttribute('cy', dotY);
-                        marker.setAttribute('r', size);
-                        marker.setAttribute('class', 'marker');
-                        marker.style.opacity = (1 - markerProgress) * 0.7;
-                        svg.appendChild(marker);
-                    }
-                }
+                // Store line info
+                lines.push({
+                    number: lineNumber,
+                    x,
+                    controlX,
+                    d,
+                    isInMainPath
+                });
             }
+
+            // Second pass - add edge paths and dots
+            [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
+                const edgeLine = lines.find(line => line.number === edgeNum);
+                if (!edgeLine) return;
+
+                const edgePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                edgePath.setAttribute('d', edgeLine.d);
+                edgePath.setAttribute('class', 'path-edge');
+                svg.appendChild(edgePath);
+
+                // Add dots along the edge
+                for (let j = 0; j < dotsCount; j++) {
+                    const markerProgress = ((progress % 1 + 1) + j * (1 / dotsCount)) % 1;
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    
+                    const t = markerProgress;
+                    const mt = 1 - t;
+                    const dotX = mt * mt * edgeLine.x + 2 * mt * t * edgeLine.controlX + t * t * vpX;
+                    const dotY = mt * mt * height + 2 * mt * t * controlY + t * t * finalY;
+                    
+                    const size = dotBaseSize * (1 - markerProgress * 0.8);
+                    
+                    marker.setAttribute('cx', dotX);
+                    marker.setAttribute('cy', dotY);
+                    marker.setAttribute('r', size);
+                    marker.setAttribute('class', 'marker');
+                    marker.style.opacity = (1 - markerProgress) * 0.7;
+                    svg.appendChild(marker);
+                }
+            });
         }
 
         // Helper function for linear interpolation
