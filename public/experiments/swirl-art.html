@@ -25,6 +25,10 @@
             backdrop-filter: blur(5px);
             border: 1px solid rgba(255,255,255,0.1);
             min-width: 200px;
+            transition: transform 0.3s ease-out;
+        }
+        #controls.hidden {
+            transform: translateX(calc(100% + 20px));
         }
         .control-group {
             margin: 10px 0;
@@ -78,11 +82,6 @@
         .preset-btn:hover {
             background: rgba(255,255,255,0.2);
         }
-        #mouse-trail {
-            position: fixed;
-            pointer-events: none;
-            z-index: 1000;
-        }
         /* Toggle switch styling */
         .switch {
             position: relative;
@@ -124,9 +123,158 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
+        /* Info button styling */
+        .info-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .info-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 85vh;
+            color: white;
+            z-index: 1001;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            font-size: 14px;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            overflow-y: auto;
+            padding-right: 12px;
+            margin-right: -12px;
+            flex: 1;
+        }
+        .modal h2 {
+            color: #2196F3;
+            margin: 0 0 12px 0;
+            font-size: 20px;
+        }
+        .modal h3 {
+            font-size: 16px;
+            margin: 0 0 8px 0;
+        }
+        .concept {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        .concept p {
+            margin: 0;
+            line-height: 1.4;
+        }
+        .tips-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+        }
+        .tips-list span {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+        }
+        .modal-close:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.2);
+        }
+        /* Controls toggle button */
+        .controls-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 101;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .controls-toggle:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+        /* Custom scrollbar styling */
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        .modal-content::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        .modal-content::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.4);
+        }
     </style>
 </head>
 <body>
+    <button class="info-btn" onclick="showModal()">?</button>
+    <button class="controls-toggle" onclick="toggleControls()">⚙️</button>
     <div id="controls">
         <h3 style="margin-top: 0; color: #fff; text-align: center;">AI Swirl Art</h3>
         <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
@@ -168,10 +316,46 @@
             </div>
         </div>
     </div>
-    <div class="info">
+    <div class="info" style="display: none;">
         Click anywhere to toggle animation • Mouse move to influence paths • Scroll to control flow
     </div>
     <svg id="scene"></svg>
+    <div id="infoModal" class="modal">
+        <button class="modal-close" onclick="hideModal()">×</button>
+        <div class="modal-content">
+            <h2>AI Swirl Art</h2>
+
+            <div class="concept">
+                <h3>💡 Quick Tips</h3>
+                <div class="tips-list">
+                    <span>Mouse to influence paths</span>
+                    <span>Try different presets</span>
+                    <span>Adjust line count & swirl</span>
+                    <span>Scroll to control flow</span>
+                </div>
+            </div>
+            
+            <div class="concept">
+                <h3>🎨 The Story</h3>
+                <p>What started as a "bug" in path calculations became art. Using sine waves and Bézier curves, each path creates organic motion through pure mathematics.</p>
+            </div>
+
+            <div class="concept">
+                <h3>🧮 The Math</h3>
+                <p>Multiple sine waves control the swirling motion, while cubic Bézier curves shape each path. These mathematical functions combine to create smooth, natural-looking movement that responds to your interaction.</p>
+            </div>
+
+            <div class="concept">
+                <h3>🌈 Colors & Motion</h3>
+                <p>The color modes use HSL space for smooth transitions - from energetic rainbow waves to zen-like monochrome flows. Each preset tells a different visual story.</p>
+            </div>
+
+            <div class="concept">
+                <h3>🤖 AI + Human</h3>
+                <p>A collaboration between AI and human creativity, this piece emerged through iteration and experimentation, blending code with artistic expression.</p>
+            </div>
+        </div>
+    </div>
     <script>
         const svg = document.getElementById('scene');
         const speedControl = document.getElementById('speed');
@@ -179,7 +363,7 @@
         const colorMode = document.getElementById('colorMode');
         const lineCountControl = document.getElementById('lineCount');
         
-        let vpY = window.innerHeight * 0.6;
+        let vpY = window.innerHeight * 0.5;
         let vpX = window.innerWidth * 0.5;
         let progress = 0;
         let pathOffset = 0;
@@ -336,6 +520,12 @@
             });
         });
 
+        // Update auto-play checkbox
+        const autoPlayCheckbox = document.getElementById('autoPlay');
+        autoPlayCheckbox.addEventListener('change', () => {
+            autoAnimate = autoPlayCheckbox.checked;
+        });
+
         // Toggle animation on click
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('preset-btn') || 
@@ -345,11 +535,41 @@
             autoPlayCheckbox.checked = autoAnimate;
         });
 
-        // Update auto-play checkbox
-        const autoPlayCheckbox = document.getElementById('autoPlay');
-        autoPlayCheckbox.addEventListener('change', () => {
-            autoAnimate = autoPlayCheckbox.checked;
+        // Modal functions
+        function showModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function hideModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal when clicking outside or on close button
+        window.addEventListener('mousedown', (e) => {
+            const modal = document.getElementById('infoModal');
+            if (e.target === modal || e.target.classList.contains('modal-close')) {
+                hideModal();
+            }
         });
+
+        // Prevent modal from closing when clicking inside
+        document.querySelector('.modal-content').addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        // Controls toggle function
+        function toggleControls() {
+            const controls = document.getElementById('controls');
+            controls.classList.toggle('hidden');
+        }
+
+        // Initialize controls visible
+        const controls = document.getElementById('controls');
+        controls.classList.remove('hidden');
 
         createScene();
         animate();

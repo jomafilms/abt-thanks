@@ -45,6 +45,21 @@ const SAMPLE_NAMES = [
 
 export default function Home() {
   const { scrollYProgress } = useScroll();
+  const [windowWidth, setWindowWidth] = React.useState(0);
+
+  // Handle window resize
+  React.useEffect(() => {
+    // Set initial width
+    setWindowWidth(window.innerWidth);
+
+    // Update width on resize
+    function handleResize() {
+      setWindowWidth(window.innerWidth);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Main content translation
   const translateX = useTransform(
@@ -117,7 +132,7 @@ export default function Home() {
         <motion.div 
           className="absolute bottom-12 left-0 z-26"
           style={{ 
-            x: useTransform(scrollYProgress, [0, 1], [0, window.innerWidth - 60])
+            x: useTransform(scrollYProgress, [0, 1], [0, Math.max(0, windowWidth - 60)])
           }}
         >
           <div className="w-[40px] h-[40px]">
