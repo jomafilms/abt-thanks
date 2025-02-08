@@ -238,17 +238,34 @@
             // Skip first and last points (yellow dots)
             for (let i = 1; i < controlPoints.length - 1; i++) {
                 const point = controlPoints[i];
+                
+                // Calculate base progress - same for all points
                 const progress = Math.min(scrollProgress / MAX_SCROLL, 1);
                 
-                // Calculate how far the point should move towards the bottom point
-                const t = progress;
+                // Calculate exit offset based on position
+                // Points closer to the bottom will exit earlier
+                const exitOffset = (i - 1) / (controlPoints.length - 3); // -3 accounts for start/end points
+                const exitThreshold = 0.5 + (exitOffset * 0.5); // Spread exit points between 0.5 and 1.0
                 
-                // Move both x and y positions towards the bottom point while maintaining relative offset
+                // Calculate position scale and vertical movement
+                let scale;
+                let verticalProgress;
+                
+                if (progress < exitThreshold) {
+                    // Normal movement phase
+                    scale = 1 - progress;
+                    verticalProgress = progress;
+                } else {
+                    // Exit phase - ensure point reaches bottom before disappearing
+                    const exitProgress = (progress - exitThreshold) / (1 - exitThreshold);
+                    scale = Math.max(0, 1 - progress - exitProgress);
+                    verticalProgress = 1;
+                }
+                
+                // Move both x and y positions
                 const xOffset = point.initialX - startX;  // Offset from center
                 const yOffset = point.initialY - startY;  // Offset from bottom
                 
-                // As progress increases, reduce the offsets (making the curve smaller)
-                const scale = 1 - t;
                 point.x = startX + (xOffset * scale);
                 point.y = startY + (yOffset * scale);
             }
