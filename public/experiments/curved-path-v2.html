@@ -94,8 +94,8 @@
             // Calculate dot positions
             const numDots = Math.ceil(1.2 / DOT_SPACING);  // Number of dots to show
             for (let i = 0; i < numDots; i++) {
-                // Calculate t value for this dot
-                let t = (scrollProgress + (i * DOT_SPACING)) % 1.2;
+                // Calculate t value for this dot, but keep the base scrollProgress continuous
+                let t = ((scrollProgress % 1.2) + (i * DOT_SPACING)) % 1.2;
                 
                 // Only show dots within our view range
                 if (t >= 0 && t <= 1.2) {
@@ -143,8 +143,9 @@
             e.preventDefault();
             
             const delta = e.deltaY * SCROLL_SENSITIVITY * 0.001;
-            scrollProgress = ((scrollProgress + delta) % 1.2 + 1.2) % 1.2;  // Keep scrollProgress within [0, 1.2]
+            scrollProgress += delta;  // Let scrollProgress grow continuously
             
+            // Only use modulo for dot positioning, not for the wave phase
             updateDots();
             updatePath();  // Need to update path each frame for the wave motion
         }, { passive: false });
