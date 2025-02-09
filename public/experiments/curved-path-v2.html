@@ -209,84 +209,82 @@
 
         // Calculate safe maximums based on viewport and other controls
         function updateControlLimits() {
-            // Base maximum amplitude as percentage of viewport width
-            const baseMaxAmplitude = Math.min(0.3, width / 2500);  // More conservative base
+            // Base maximum values that don't change with other controls
+            const baseMaxAmplitude = Math.min(0.3, width / 2500);
+            const baseMaxFreq = Math.min(4, width / 600);
+            const baseMaxLookAhead = Math.min(0.4, width / 2500);
+            const baseMaxSecondary = Math.min(0.8, width / 2000);
+            const baseMaxTertiary = Math.min(0.6, width / 2000);
             
-            // Calculate combined effect of all wave controls
+            // Only adjust current values if they would exceed safe limits
             const totalWaveStrength = parseFloat(controls.secondary.value) + parseFloat(controls.tertiary.value);
-            const combinedWaveFactor = 1 / Math.max(1, totalWaveStrength * 2);
             
-            // Adjust amplitude max based on all factors
-            const freqFactor = 1 / Math.max(1, controls.frequency.value * 1.5);
-            const lookAheadFactor = 1 / Math.max(1, controls.lookAhead.value * 3);
-            const safeAmplitude = baseMaxAmplitude * freqFactor * lookAheadFactor * combinedWaveFactor;
+            // Check amplitude safety
+            const currentAmplitude = parseFloat(controls.amplitude.value);
+            const freqFactor = controls.frequency.value > 2 ? 1 / Math.max(1, controls.frequency.value * 1.5) : 1;
+            const safeAmplitude = baseMaxAmplitude * freqFactor;
             
-            // Update amplitude control
-            controls.amplitude.max = safeAmplitude.toFixed(2);
-            if (parseFloat(controls.amplitude.value) > safeAmplitude) {
+            if (currentAmplitude > safeAmplitude) {
                 controls.amplitude.value = safeAmplitude;
                 controls.amplitude.nextElementSibling.textContent = safeAmplitude.toFixed(2);
             }
+            controls.amplitude.max = baseMaxAmplitude;
             
-            // Adjust frequency max based on viewport and other factors
-            const baseMaxFreq = Math.min(3, width / 600);  // More conservative base
-            const amplitudeFactor = 1 / Math.max(1, controls.amplitude.value * 4);
-            const wavesFactor = 1 / Math.max(1, totalWaveStrength * 1.5);
-            const safeFreq = baseMaxFreq * amplitudeFactor * wavesFactor;
+            // Check look-ahead safety
+            const currentLookAhead = parseFloat(controls.lookAhead.value);
+            const lookAheadDanger = controls.amplitude.value * controls.frequency.value * 2 + totalWaveStrength;
+            const safeLookAhead = lookAheadDanger > 2 ? baseMaxLookAhead / lookAheadDanger : baseMaxLookAhead;
             
-            // Update frequency control
-            controls.frequency.max = safeFreq.toFixed(1);
-            if (parseFloat(controls.frequency.value) > safeFreq) {
-                controls.frequency.value = safeFreq;
-                controls.frequency.nextElementSibling.textContent = safeFreq.toFixed(1);
-            }
-            
-            // Adjust look-ahead based on all factors
-            const baseMaxLookAhead = Math.min(0.4, width / 2500);  // More conservative base
-            const combinedFactor = 1 / Math.max(1, (controls.amplitude.value * controls.frequency.value * 2) + totalWaveStrength);
-            const safeLookAhead = baseMaxLookAhead * combinedFactor;
-            
-            // Update look-ahead control
-            controls.lookAhead.max = safeLookAhead.toFixed(2);
-            if (parseFloat(controls.lookAhead.value) > safeLookAhead) {
+            if (currentLookAhead > safeLookAhead) {
                 controls.lookAhead.value = safeLookAhead;
                 controls.lookAhead.nextElementSibling.textContent = safeLookAhead.toFixed(2);
             }
+            controls.lookAhead.max = baseMaxLookAhead;
             
-            // Secondary and tertiary waves scale with all factors
-            const baseMaxSecondary = Math.min(0.8, width / 2000);  // More conservative base
-            const baseMaxTertiary = Math.min(0.6, width / 2000);   // Even more conservative for detail wave
+            // Secondary and tertiary waves only adjust if they would create unsafe combinations
+            const currentSecondary = parseFloat(controls.secondary.value);
+            const currentTertiary = parseFloat(controls.tertiary.value);
             
-            const mainFactor = 1 / Math.max(1, controls.amplitude.value * 3);
-            const freqWaveFactor = 1 / Math.max(1, controls.frequency.value * 2);
-            
-            // Calculate safe values considering interdependencies
-            const safeSecondary = baseMaxSecondary * mainFactor * freqWaveFactor;
-            const safeTertiary = baseMaxTertiary * mainFactor * freqWaveFactor;
-            
-            // Update secondary and tertiary controls
-            controls.secondary.max = safeSecondary.toFixed(2);
-            controls.tertiary.max = safeTertiary.toFixed(2);
-            
-            if (parseFloat(controls.secondary.value) > safeSecondary) {
-                controls.secondary.value = safeSecondary;
-                controls.secondary.nextElementSibling.textContent = safeSecondary.toFixed(2);
+            if (totalWaveStrength > 1.5) {
+                const scaleFactor = 1.5 / totalWaveStrength;
+                const newSecondary = currentSecondary * scaleFactor;
+                const newTertiary = currentTertiary * scaleFactor;
+                
+                controls.secondary.value = newSecondary;
+                controls.tertiary.value = newTertiary;
+                controls.secondary.nextElementSibling.textContent = newSecondary.toFixed(2);
+                controls.tertiary.nextElementSibling.textContent = newTertiary.toFixed(2);
             }
-            if (parseFloat(controls.tertiary.value) > safeTertiary) {
-                controls.tertiary.value = safeTertiary;
-                controls.tertiary.nextElementSibling.textContent = safeTertiary.toFixed(2);
-            }
+            
+            controls.secondary.max = baseMaxSecondary;
+            controls.tertiary.max = baseMaxTertiary;
+            controls.frequency.max = baseMaxFreq;
         }
 
         // Update value displays and limits
         Object.entries(controls).forEach(([key, control]) => {
             const display = control.nextElementSibling;
             control.addEventListener('input', () => {
-                display.textContent = control.value;
+                // Special handling for frequency to show actual number of visual curves
+                if (key === 'frequency') {
+                    display.textContent = (control.value * 2).toFixed(1);
+                } else {
+                    display.textContent = control.value;
+                }
                 updateControlLimits(); // Update limits when any control changes
                 updatePath();
                 updateDots();
             });
+        });
+
+        // Initial display setup
+        Object.entries(controls).forEach(([key, control]) => {
+            const display = control.nextElementSibling;
+            if (key === 'frequency') {
+                display.textContent = (control.value * 2).toFixed(1);
+            } else {
+                display.textContent = control.value;
+            }
         });
 
         // Update limits on window resize
