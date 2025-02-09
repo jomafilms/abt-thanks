@@ -1,0 +1,129 @@
+body {
+    margin: 0;
+    background: #111;
+    min-height: 100vh;
+    overflow: hidden;
+}
+svg {
+    width: 100vw;
+    height: 100vh;
+}
+.path {
+    fill: none;
+    stroke: #D4A373;
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.5;
+}
+.path-edge {
+    fill: none;
+    stroke: #D4A373;
+    stroke-width: 3;
+    stroke-linecap: round;
+    opacity: 0.8;
+}
+.path-parallel {
+    fill: none;
+    stroke: #D4A373;
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.5;
+}
+.horizon-line {
+    stroke: #D4A373;
+    stroke-width: 1;
+    opacity: 0.3;
+}
+.dot {
+    fill: #D4A373;
+    transition: opacity 0.2s ease-out;
+}
+.controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    color: #D4A373;
+    font-family: sans-serif;
+    min-width: 200px;
+    transition: opacity 0.3s ease-out;
+}
+.controls.collapsed {
+    opacity: 0;
+    pointer-events: none;
+}
+.controls.collapsed .controls-content {
+    opacity: 0;
+}
+.gear-icon {
+    position: fixed;
+    right: 20px;
+    top: 20px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    color: #D4A373;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 8px;
+    border-radius: 50%;
+    z-index: 1000;
+}
+.controls-content {
+    margin-top: 15px;
+    transition: opacity 0.2s ease-out;
+}
+.control-group {
+    margin-bottom: 15px;
+}
+.control-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+.control-group input {
+    width: 100%;
+    margin-bottom: 5px;
+}
+.value-display {
+    font-size: 10px;
+    color: rgba(212, 163, 115, 0.7);
+}
+.auto-scroll {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(212, 163, 115, 0.3);
+}
+.play-button {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    color: #D4A373;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.play-button:hover {
+    color: #e4b383;
+}
+.auto-scroll-label {
+    font-size: 12px;
+}
+.path-grid {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.3);
+    stroke-width: 1;
+    opacity: 0.4;
+}
+.debug-text {
+    fill: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    font-family: monospace;
+} 
