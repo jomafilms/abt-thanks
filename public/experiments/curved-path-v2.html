@@ -365,6 +365,17 @@
         // Configuration loading
         let staticConfig = null;
         let markersWithNames = [];
+        let hasStarted = false;  // Track if animation has started
+        let scrollProgress = 0;  // Initialize at 0 instead of using baseProgress
+        
+        // Function to calculate a marker's progress
+        function calculateMarkerProgress(marker) {
+            if (!hasStarted) {
+                return marker.startProgress;
+            }
+            // Calculate progress from the initial position
+            return ((scrollProgress + marker.startProgress) % 1 + 1) % 1;
+        }
 
         // Function to load and merge configuration
         async function loadConfiguration() {
@@ -404,9 +415,13 @@
             horizonLine.setAttribute('y2', HORIZON_Y + bounceOffset);
         }
 
-        // Update scroll handler to include bounce
+        // Update scroll handler to include bounce and progress
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
+            if (!hasStarted) {
+                hasStarted = true;
+                scrollProgress = 0;  // Start from 0 when animation begins
+            }
             
             const delta = e.deltaY * controls.sensitivity.value * 0.001;
             scrollProgress += delta;
@@ -419,10 +434,14 @@
             updateDots();
         }, { passive: false });
 
-        // Update auto-scroll to include bounce
+        // Update auto-scroll to include progress
         function updateAutoScroll() {
             if (isAutoScrolling) {
                 const scrollStep = () => {
+                    if (!hasStarted) {
+                        hasStarted = true;
+                        scrollProgress = 0;  // Start from 0 when animation begins
+                    }
                     scrollProgress += 0.001 * controls.sensitivity.value;
                     bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
                     updateHorizonLine();
@@ -674,7 +693,7 @@
                     if (!markerLine) return;
 
                     // Calculate marker position along the path using progress
-                    const t = marker.startProgress;
+                    const t = calculateMarkerProgress(marker);
                     const worldPos = worldCurveAt(t);
                     worldPos.x += markerLine.xOffset * t; // Apply line offset
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
@@ -683,39 +702,42 @@
                     const config = marker.type === 'circle' ? staticConfig.config.circles : staticConfig.config.rectangles;
                     const minSize = config.minSize || 2;
                     const maxSize = config.maxSize || 16;
-                    const baseSize = minSize + (maxSize - minSize) * (1 - t);
+                    const baseSize = minSize + (maxSize - minSize) * t;
 
-                    if (marker.type === 'circle') {
-                        // Create and position the circle
-                        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                        circle.setAttribute('cx', pos.x);
-                        circle.setAttribute('cy', pos.y);
-                        circle.setAttribute('r', baseSize);
-                        circle.setAttribute('fill', marker.color);
-                        svg.appendChild(circle);
-                    } else if (marker.type === 'rectangle' && marker.name) {
-                        // Create and position the rectangle
-                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        const rectWidth = baseSize * config.defaultWidth;
-                        const rectHeight = baseSize * config.defaultHeight;
-                        rect.setAttribute('x', pos.x - rectWidth/2);
-                        rect.setAttribute('y', pos.y - rectHeight/2);
-                        rect.setAttribute('width', rectWidth);
-                        rect.setAttribute('height', rectHeight);
-                        rect.setAttribute('fill', marker.color);
-                        rect.setAttribute('rx', rectHeight * config.cornerRadius);
-                        svg.appendChild(rect);
+                    // Only render if the marker is within view range (0 to 1)
+                    if (t >= 0 && t <= 1) {
+                        if (marker.type === 'circle') {
+                            // Create and position the circle
+                            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                            circle.setAttribute('cx', pos.x);
+                            circle.setAttribute('cy', pos.y);
+                            circle.setAttribute('r', baseSize);
+                            circle.setAttribute('fill', marker.color);
+                            svg.appendChild(circle);
+                        } else if (marker.type === 'rectangle' && marker.name) {
+                            // Create and position the rectangle
+                            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            const rectWidth = baseSize * config.defaultWidth;
+                            const rectHeight = baseSize * config.defaultHeight;
+                            rect.setAttribute('x', pos.x - rectWidth/2);
+                            rect.setAttribute('y', pos.y - rectHeight/2);
+                            rect.setAttribute('width', rectWidth);
+                            rect.setAttribute('height', rectHeight);
+                            rect.setAttribute('fill', marker.color);
+                            rect.setAttribute('rx', rectHeight * config.cornerRadius);
+                            svg.appendChild(rect);
 
-                        // Add name label inside rectangle
-                        const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                        nameLabel.setAttribute('x', pos.x);
-                        nameLabel.setAttribute('y', pos.y + baseSize * 0.3);
-                        nameLabel.setAttribute('fill', '#000');
-                        nameLabel.setAttribute('font-size', `${baseSize * config.fontScale}px`);
-                        nameLabel.setAttribute('text-anchor', 'middle');
-                        nameLabel.setAttribute('dominant-baseline', 'middle');
-                        nameLabel.textContent = marker.name;
-                        svg.appendChild(nameLabel);
+                            // Add name label inside rectangle
+                            const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                            nameLabel.setAttribute('x', pos.x);
+                            nameLabel.setAttribute('y', pos.y + baseSize * 0.3);
+                            nameLabel.setAttribute('fill', '#000');
+                            nameLabel.setAttribute('font-size', `${baseSize * config.fontScale}px`);
+                            nameLabel.setAttribute('text-anchor', 'middle');
+                            nameLabel.setAttribute('dominant-baseline', 'middle');
+                            nameLabel.textContent = marker.name;
+                            svg.appendChild(nameLabel);
+                        }
                     }
                 });
             }
@@ -726,7 +748,6 @@
 
         // Initialize
         let lastAngle = 0;
-        let scrollProgress = 0;
         loadConfiguration();  // Load config first, which will then call updatePath()
         updateDots();
 
