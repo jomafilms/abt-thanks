@@ -65,7 +65,11 @@
         <path class="path"/>
     </svg>
 
-    <script>
+    <script type="module">
+        import { lerp, clamp, worldCurveAt, applyPerspective, curveAt, getPathWidth, updatePathEdges, addDebugText } from './js/path-calculations.js';
+        import { Controls } from './js/controls.js';
+        import MarkerManager from './js/markers.js';
+
         // Get viewport dimensions
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -87,122 +91,6 @@
         svg.appendChild(horizonLine);
         svg.appendChild(path);
         
-        // Controls setup
-        const controls = {
-            amplitude: document.getElementById('amplitude'),
-            frequency: document.getElementById('frequency'),
-            lookAhead: document.getElementById('lookAhead'),
-            secondary: document.getElementById('secondary'),
-            tertiary: document.getElementById('tertiary'),
-            sensitivity: document.getElementById('sensitivity'),
-            pathWidth: document.getElementById('pathWidth')
-        };
-
-        // Calculate safe maximums based on viewport and other controls
-        function updateControlLimits() {
-            // Base maximum amplitude as percentage of viewport width
-            const baseMaxAmplitude = Math.min(0.3, width / 2500);  // More conservative base
-            
-            // Calculate combined effect of all wave controls
-            const totalWaveStrength = parseFloat(controls.secondary.value) + parseFloat(controls.tertiary.value);
-            const combinedWaveFactor = 1 / Math.max(1, totalWaveStrength * 2);
-            
-            // Adjust amplitude max based on all factors
-            const freqFactor = 1 / Math.max(1, controls.frequency.value * 1.5);
-            const lookAheadFactor = 1 / Math.max(1, controls.lookAhead.value * 3);
-            const safeAmplitude = baseMaxAmplitude * freqFactor * lookAheadFactor * combinedWaveFactor;
-            
-            // Update amplitude control
-            controls.amplitude.max = safeAmplitude.toFixed(2);
-            if (parseFloat(controls.amplitude.value) > safeAmplitude) {
-                controls.amplitude.value = safeAmplitude;
-                controls.amplitude.nextElementSibling.textContent = safeAmplitude.toFixed(2);
-            }
-            
-            // Adjust frequency max based on viewport and other factors
-            const baseMaxFreq = Math.min(3, width / 600);  // More conservative base
-            const amplitudeFactor = 1 / Math.max(1, controls.amplitude.value * 4);
-            const wavesFactor = 1 / Math.max(1, totalWaveStrength * 1.5);
-            const safeFreq = baseMaxFreq * amplitudeFactor * wavesFactor;
-            
-            // Update frequency control
-            controls.frequency.max = safeFreq.toFixed(1);
-            if (parseFloat(controls.frequency.value) > safeFreq) {
-                controls.frequency.value = safeFreq;
-                controls.frequency.nextElementSibling.textContent = safeFreq.toFixed(1);
-            }
-            
-            // Adjust look-ahead based on all factors
-            const baseMaxLookAhead = Math.min(0.4, width / 2500);  // More conservative base
-            const combinedFactor = 1 / Math.max(1, (controls.amplitude.value * controls.frequency.value * 2) + totalWaveStrength);
-            const safeLookAhead = baseMaxLookAhead * combinedFactor;
-            
-            // Update look-ahead control
-            controls.lookAhead.max = safeLookAhead.toFixed(2);
-            if (parseFloat(controls.lookAhead.value) > safeLookAhead) {
-                controls.lookAhead.value = safeLookAhead;
-                controls.lookAhead.nextElementSibling.textContent = safeLookAhead.toFixed(2);
-            }
-            
-            // Secondary and tertiary waves scale with all factors
-            const baseMaxSecondary = Math.min(0.8, width / 2000);  // More conservative base
-            const baseMaxTertiary = Math.min(0.6, width / 2000);   // Even more conservative for detail wave
-            
-            const mainFactor = 1 / Math.max(1, controls.amplitude.value * 3);
-            const freqWaveFactor = 1 / Math.max(1, controls.frequency.value * 2);
-            
-            // Calculate safe values considering interdependencies
-            const safeSecondary = baseMaxSecondary * mainFactor * freqWaveFactor;
-            const safeTertiary = baseMaxTertiary * mainFactor * freqWaveFactor;
-            
-            // Update secondary and tertiary controls
-            controls.secondary.max = safeSecondary.toFixed(2);
-            controls.tertiary.max = safeTertiary.toFixed(2);
-            
-            if (parseFloat(controls.secondary.value) > safeSecondary) {
-                controls.secondary.value = safeSecondary;
-                controls.secondary.nextElementSibling.textContent = safeSecondary.toFixed(2);
-            }
-            if (parseFloat(controls.tertiary.value) > safeTertiary) {
-                controls.tertiary.value = safeTertiary;
-                controls.tertiary.nextElementSibling.textContent = safeTertiary.toFixed(2);
-            }
-        }
-
-        // Update value displays and limits
-        Object.entries(controls).forEach(([key, control]) => {
-            const display = control.nextElementSibling;
-            control.addEventListener('input', () => {
-                // Special handling for frequency to show actual number of visual curves
-                if (key === 'frequency') {
-                    display.textContent = (control.value * 2).toFixed(1);
-                } else {
-                    display.textContent = control.value;
-                }
-                updateControlLimits(); // Update limits when any control changes
-                updatePath();
-                updateDots();
-            });
-        });
-
-        // Initial display setup
-        Object.entries(controls).forEach(([key, control]) => {
-            const display = control.nextElementSibling;
-            if (key === 'frequency') {
-                display.textContent = (control.value * 2).toFixed(1);
-            } else {
-                display.textContent = control.value;
-            }
-        });
-
-        // Update limits on window resize
-        window.addEventListener('resize', () => {
-            updateControlLimits();
-        });
-
-        // Initial limits setup
-        updateControlLimits();
-        
         // Constants for perspective and path
         const HORIZON_Y = height * 0.4;
         const VANISHING_POINT_X = width * 0.5;
@@ -217,27 +105,9 @@
         const NUM_GRID_LINES = Math.ceil((totalWidth / BASE_LINE_SPACING) / 2);  // Divide by 2 since we're counting from center
         const NUM_LATITUDE_LINES = 10;
         let bounceOffset = 0;
-
-        // Path width control
-        function getPathWidth() {
-            return width * (parseFloat(controls.pathWidth.value) / 100);
-        }
-
-        function updatePathEdges() {
-            const pathHalfWidth = getPathWidth() / 2;
-            const linesInPathHalf = Math.ceil(pathHalfWidth / BASE_LINE_SPACING);
-            return {
-                left: -linesInPathHalf,
-                right: linesInPathHalf
-            };
-        }
-
-        // Configuration loading
-        let staticConfig = null;
-        let markersWithNames = [];
         let hasStarted = false;  // Track if animation has started
         let scrollProgress = 0;  // Initialize at 0 instead of using baseProgress
-        
+
         // Function to calculate a marker's progress
         function calculateMarkerProgress(marker) {
             if (!hasStarted) {
@@ -247,161 +117,10 @@
             return ((scrollProgress + marker.startProgress) % 1 + 1) % 1;
         }
 
-        // Function to load and merge configuration
-        async function loadConfiguration() {
-            try {
-                // Load static configuration
-                const staticResponse = await fetch('static.json');
-                staticConfig = await staticResponse.json();
-
-                // Load names
-                const namesResponse = await fetch('names.json');
-                const namesData = await namesResponse.json();
-
-                // Assign names to available markers
-                markersWithNames = staticConfig.markers.map(marker => {
-                    if (marker.canReceiveName && namesData.names.length > 0) {
-                        const nextName = namesData.names.shift();
-                        return { ...marker, name: nextName.name };
-                    }
-                    return marker;
-                });
-
-                // Initial scene creation
-                updatePath();
-            } catch (error) {
-                console.error('Error loading configuration:', error);
-            }
-        }
-
-        // Helper function for linear interpolation
-        function lerp(start, end, t) {
-            return start * (1 - t) + end * t;
-        }
-
         // Helper function to update horizon line position
         function updateHorizonLine() {
             horizonLine.setAttribute('y1', HORIZON_Y + bounceOffset);
             horizonLine.setAttribute('y2', HORIZON_Y + bounceOffset);
-        }
-
-        // Update scroll handler to include bounce and progress
-        window.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            if (!hasStarted) {
-                hasStarted = true;
-                scrollProgress = 0;  // Start from 0 when animation begins
-            }
-            
-            const delta = e.deltaY * controls.sensitivity.value * 0.001;
-            scrollProgress += delta;
-            
-            // Update bounce offset based on scroll progress
-            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
-            
-            updateHorizonLine();
-            updatePath();
-            updateDots();
-        }, { passive: false });
-
-        // Update auto-scroll to include progress
-        function updateAutoScroll() {
-            if (isAutoScrolling) {
-                const scrollStep = () => {
-                    if (!hasStarted) {
-                        hasStarted = true;
-                        scrollProgress = 0;  // Start from 0 when animation begins
-                    }
-                    scrollProgress += 0.001 * controls.sensitivity.value;
-                    bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
-                    updateHorizonLine();
-                    updateDots();
-                    updatePath();
-                    autoScrollAnimation = requestAnimationFrame(scrollStep);
-                };
-                autoScrollAnimation = requestAnimationFrame(scrollStep);
-            } else {
-                cancelAnimationFrame(autoScrollAnimation);
-            }
-        }
-
-        // Modify applyPerspective to use bouncing vanishing point
-        function applyPerspective(x, y, t) {
-            const scale = 1 / (1 + PERSPECTIVE_FACTOR * t);
-            return {
-                x: VANISHING_POINT_X + (x - VANISHING_POINT_X) * scale,
-                y: (HORIZON_Y + bounceOffset) + (y - (HORIZON_Y + bounceOffset)) * scale
-            };
-        }
-
-        // Helper function to clamp a value between min and max
-        function clamp(value, min, max) {
-            return Math.min(Math.max(value, min), max);
-        }
-
-        // Define the curve shape in world coordinates
-        function worldCurveAt(t) {
-            // Extend the base Y position to go 20% beyond the bottom of the screen
-            const extendedHeight = height * 1.2;
-            const baseY = lerp(HORIZON_Y, extendedHeight, t);
-            
-            // Rest of the function remains the same
-            const PATH_BASE_AMPLITUDE = width * controls.amplitude.value;
-            const LOOK_AHEAD_STRENGTH = controls.lookAhead.value;
-            const SECONDARY_STRENGTH = controls.secondary.value;
-            const TERTIARY_STRENGTH = controls.tertiary.value;
-            
-            // Calculate frequencies based on the number of curves control
-            const baseFreq = Math.PI * 2 * controls.frequency.value;
-            const WAVE_FREQUENCY = baseFreq;
-            const SECONDARY_FREQUENCY = baseFreq * 0.5;
-            const TERTIARY_FREQUENCY = baseFreq * 2;
-            
-            // Calculate wave phases based on scroll progress
-            const mainPhase = -scrollProgress * WAVE_FREQUENCY;
-            const secondaryPhase = -scrollProgress * SECONDARY_FREQUENCY * 0.7;
-            const tertiaryPhase = -scrollProgress * TERTIARY_FREQUENCY * 1.3;
-            
-            const lookAheadPhase = mainPhase + WAVE_FREQUENCY * 0.25;
-            const nextDirection = Math.cos(lookAheadPhase);
-            
-            const mainAmplitude = PATH_BASE_AMPLITUDE * t;
-            const secondaryAmplitude = PATH_BASE_AMPLITUDE * SECONDARY_STRENGTH * t;
-            const tertiaryAmplitude = PATH_BASE_AMPLITUDE * TERTIARY_STRENGTH * t;
-            
-            const exitBias = -nextDirection * PATH_BASE_AMPLITUDE * LOOK_AHEAD_STRENGTH * Math.pow(t, 2);
-            
-            const mainWave = Math.sin(t * WAVE_FREQUENCY + mainPhase) * mainAmplitude;
-            const secondaryWave = Math.sin(t * SECONDARY_FREQUENCY + secondaryPhase) * secondaryAmplitude;
-            const tertiaryWave = Math.sin(t * TERTIARY_FREQUENCY + tertiaryPhase) * tertiaryAmplitude;
-            
-            let x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave + exitBias;
-            
-            const minX = VIEWPORT_MARGIN;
-            const maxX = width - VIEWPORT_MARGIN;
-            
-            const smoothStep = (x) => x * x * (3 - 2 * x);
-            const clampStrength = smoothStep(Math.pow(t, 2));
-            
-            const overMin = Math.max(0, minX - x);
-            const overMax = Math.max(0, x - maxX);
-            
-            if (overMin > 0) {
-                const smoothTransition = smoothStep(Math.min(1, overMin / (PATH_BASE_AMPLITUDE * 0.5)));
-                x = lerp(x, minX, smoothTransition * clampStrength);
-            } else if (overMax > 0) {
-                const smoothTransition = smoothStep(Math.min(1, overMax / (PATH_BASE_AMPLITUDE * 0.5)));
-                x = lerp(x, maxX, smoothTransition * clampStrength);
-            }
-            
-            return { x, y: baseY };
-        }
-
-        // Get screen coordinates for a point on the curve
-        function curveAt(t) {
-            const worldPos = worldCurveAt(t);
-            const perspectiveT = 1 - t;
-            return applyPerspective(worldPos.x, worldPos.y, perspectiveT);
         }
 
         // Update dots based on scroll progress
@@ -418,7 +137,7 @@
                 
                 // Only show dots within our view range
                 if (t >= 0 && t <= 1.2) {
-                    const pos = curveAt(Math.max(0, Math.min(1, t)));
+                    const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
                     const scale = 0.5 + Math.max(0, t);
                     const dotSize = 6 * scale;
                     
@@ -438,16 +157,6 @@
             }
         }
 
-        // Helper function to add debug text
-        function addDebugText(x, y, text) {
-            const debugText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            debugText.setAttribute('x', x);
-            debugText.setAttribute('y', y);
-            debugText.setAttribute('class', 'debug-text');
-            debugText.textContent = text;
-            svg.appendChild(debugText);
-        }
-
         // Update path with perspective
         function updatePath() {
             const steps = 100;
@@ -458,7 +167,7 @@
             svg.appendChild(horizonLine);
             
             // Get current edge line numbers
-            const EDGE_LINE_NUMBERS = updatePathEdges();
+            const EDGE_LINE_NUMBERS = updatePathEdges(width, BASE_LINE_SPACING, controls.getRawValue('pathWidth'));
             
             // Add latitude lines
             for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
@@ -476,11 +185,7 @@
                 svg.appendChild(latLine);
                 
                 // Add percentage label
-                addDebugText(
-                    VANISHING_POINT_X + width * 0.42,
-                    y,
-                    `${(mt * 100).toFixed(0)}%`
-                );
+                addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(mt * 100).toFixed(0)}%`);
             }
             
             // Add vertical grid lines and store line info
@@ -495,10 +200,9 @@
                 
                 for (let j = 0; j <= steps; j++) {
                     const t = j / steps;
-                    const worldPos = worldCurveAt(t);
-                    // Scale offset more at bottom, less at top
-                    worldPos.x += xOffset * t; // Adjust x-offset based on perspective
-                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+                    const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                    worldPos.x += xOffset * t; // Add the offset to the world position
+                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
                     gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
                 }
                 
@@ -506,7 +210,8 @@
                 const isInMainPath = Math.abs(i) < EDGE_LINE_NUMBERS.right;
                 
                 gridPath.setAttribute('d', gridD);
-                gridPath.setAttribute('class', isInMainPath ? 'path-grid' : 'path-grid');
+                gridPath.setAttribute('class', 'path-grid');
+                gridPath.style.opacity = isInMainPath ? 0.4 : 0.2;
                 svg.appendChild(gridPath);
                 
                 // Store line info
@@ -519,7 +224,7 @@
                 
                 // Add line number at bottom
                 if (i % 5 === 0) {
-                    addDebugText(VANISHING_POINT_X + xOffset, height - 10, i.toString());
+                    addDebugText(svg, VANISHING_POINT_X + xOffset, height - 10, i.toString());
                 }
             }
             
@@ -529,7 +234,7 @@
             // Generate points for main path
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
-                const pos = curveAt(t);
+                const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
                 mainPoints.push(pos);
             }
             
@@ -556,101 +261,70 @@
                 svg.appendChild(edgePath);
             });
             
-            // Add markers if configuration is loaded
-            if (staticConfig && markersWithNames) {
-                markersWithNames.forEach(marker => {
-                    const markerLine = lines.find(line => line.number === marker.line);
-                    if (!markerLine) return;
-
-                    // Calculate marker position along the path using progress
-                    const t = calculateMarkerProgress(marker);
-                    const worldPos = worldCurveAt(t);
-                    worldPos.x += markerLine.xOffset * t; // Apply line offset
-                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
-
-                    // Calculate size based on position and configuration
-                    const config = marker.type === 'circle' ? staticConfig.config.circles : staticConfig.config.rectangles;
-                    const minSize = config.minSize || 2;
-                    const maxSize = config.maxSize || 16;
-                    const baseSize = minSize + (maxSize - minSize) * t;
-
-                    // Only render if the marker is within view range (0 to 1)
-                    if (t >= 0 && t <= 1) {
-                        if (marker.type === 'circle') {
-                            // Create and position the circle
-                            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                            circle.setAttribute('cx', pos.x);
-                            circle.setAttribute('cy', pos.y);
-                            circle.setAttribute('r', baseSize);
-                            circle.setAttribute('fill', marker.color);
-                            svg.appendChild(circle);
-                        } else if (marker.type === 'rectangle' && marker.name) {
-                            // Create and position the rectangle
-                            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                            const rectWidth = baseSize * config.defaultWidth;
-                            const rectHeight = baseSize * config.defaultHeight;
-                            rect.setAttribute('x', pos.x - rectWidth/2);
-                            rect.setAttribute('y', pos.y - rectHeight/2);
-                            rect.setAttribute('width', rectWidth);
-                            rect.setAttribute('height', rectHeight);
-                            rect.setAttribute('fill', marker.color);
-                            rect.setAttribute('rx', rectHeight * config.cornerRadius);
-                            svg.appendChild(rect);
-
-                            // Add name label inside rectangle
-                            const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                            nameLabel.setAttribute('x', pos.x);
-                            nameLabel.setAttribute('y', pos.y + baseSize * 0.3);
-                            nameLabel.setAttribute('fill', '#000');
-                            nameLabel.setAttribute('font-size', `${baseSize * config.fontScale}px`);
-                            nameLabel.setAttribute('text-anchor', 'middle');
-                            nameLabel.setAttribute('dominant-baseline', 'middle');
-                            nameLabel.textContent = marker.name;
-                            svg.appendChild(nameLabel);
-                        }
-                    }
-                });
-            }
+            // Add markers
+            markerManager.renderMarkers(
+                svg, 
+                lines, 
+                calculateMarkerProgress,
+                (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
+                (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR),
+                hasStarted,
+                scrollProgress
+            );
             
             // Update dots last so they're on top
             updateDots();
         }
 
-        // Initialize
-        let lastAngle = 0;
-        loadConfiguration();  // Load config first, which will then call updatePath()
-        updateDots();
-
-        // Auto-scroll functionality
-        let isAutoScrolling = false;
-        let autoScrollAnimation;
-
-        // Toggle auto-scroll
-        const playButton = document.querySelector('.play-button');
-        const playIcon = playButton.querySelector('.play-icon');
-        const pauseIcon = playButton.querySelector('.pause-icon');
-
-        playButton.addEventListener('click', () => {
-            isAutoScrolling = !isAutoScrolling;
-            playIcon.style.display = isAutoScrolling ? 'none' : 'block';
-            pauseIcon.style.display = isAutoScrolling ? 'block' : 'none';
-            updateAutoScroll();
+        // Initialize controls and markers
+        const controls = new Controls(() => {
+            updatePath();
+            updateDots();
         });
+        const markerManager = new MarkerManager();
 
-        // Stop auto-scroll when user manually scrolls
-        window.addEventListener('wheel', () => {
-            if (isAutoScrolling) {
-                isAutoScrolling = false;
-                playIcon.style.display = 'block';
-                pauseIcon.style.display = 'none';
-                updateAutoScroll();
+        // Auto-scroll function
+        function autoScroll() {
+            if (!hasStarted) {
+                hasStarted = true;
             }
+            scrollProgress += 0.001 * controls.getRawValue('sensitivity');
+            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
+            updateHorizonLine();
+            updatePath();
+            updateDots();
+        }
+
+        // Update scroll handler to include bounce and progress
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!hasStarted) {
+                hasStarted = true;
+                scrollProgress = 0;  // Start from 0 when animation begins
+            }
+            
+            const delta = e.deltaY * controls.getRawValue('sensitivity') * 0.001;
+            scrollProgress += delta;
+            
+            // Update bounce offset based on scroll progress
+            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
+            
+            updateHorizonLine();
+            updatePath();
+            updateDots();
+            
+            // Stop auto-scroll if user manually scrolls
+            controls.stopAutoScroll();
         }, { passive: false });
 
-        // Add gear icon click handler
-        document.querySelector('.gear-icon').addEventListener('click', () => {
-            document.querySelector('.controls').classList.toggle('collapsed');
-        });
+        // Initialize
+        async function init() {
+            await markerManager.loadConfiguration();
+            updatePath();
+            updateDots();
+        }
+
+        init();
     </script>
 </body>
 </html> 
