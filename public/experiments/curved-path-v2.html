@@ -21,30 +21,13 @@
             stroke-width: 2;
             stroke-linecap: round;
         }
-        #controls {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 15px;
-            border-radius: 8px;
-            color: white;
-            font-family: sans-serif;
-        }
-        #controls label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        #controls input {
-            width: 200px;
+        .dot {
+            fill: #D4A373;
+            transition: opacity 0.2s ease-out;
         }
     </style>
 </head>
 <body>
-    <div id="controls">
-        <label>Number of Control Points: <span id="pointCount">2</span></label>
-        <input type="range" id="pointSlider" min="1" max="4" value="2" step="1">
-    </div>
     <svg id="scene">
         <!-- We'll draw a single curved line from bottom to top -->
     </svg>
@@ -58,296 +41,102 @@
         const svg = document.getElementById('scene');
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute('class', 'path');
-        svg.appendChild(path);  // Add path to SVG
+        svg.appendChild(path);
         
-        // Create horizon line
-        const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        horizonLine.setAttribute('x1', 0);
-        horizonLine.setAttribute('y1', height * 0.2); // Horizon height
-        horizonLine.setAttribute('x2', width);
-        horizonLine.setAttribute('y2', height * 0.2);
-        horizonLine.setAttribute('stroke', 'rgba(255,255,255,0.2)');
-        horizonLine.setAttribute('stroke-width', '1');
-        svg.appendChild(horizonLine);
-
-        // Calculate points for a smooth curve path
-        const startX = width * 0.5;    // Center at bottom
-        const startY = height;         // Bottom of screen
-        const endX = width * 0.5;      // Center at top
-        const horizonY = height * 0.2; // Fixed horizon height
-
-        // Initialize variables
-        let controlPoints = [];
-        let dots = [];
-        let scrollProgress = 0;
-        const MAX_SCROLL = 1000;
+        // Constants for perspective and path
+        const HORIZON_Y = height * 0.2;
+        const VANISHING_POINT_X = width * 0.5;
+        const PATH_BASE_AMPLITUDE = width * 0.2;
+        const PERSPECTIVE_FACTOR = 0.8;
+        const DOT_SPACING = 0.3;
         const SCROLL_SENSITIVITY = 2.0;
-        const MAX_ACTIVE_DOTS = 3;
-        const MIN_Y = horizonY;
-        const BASE_SPACING = 0.2;
-        const HORIZON_OFFSET = 20;
-        const DOT_SPEED = 0.003;
-        const NEW_DOT_THRESHOLD = 0.85;  // When to add a new dot
-        const EXIT_THRESHOLD = 1.0;      // When to remove the bottom dot
 
-        // Define the curve shape
+        // Convert world coordinates to screen coordinates with perspective
+        function applyPerspective(x, y, t) {
+            const scale = 1 / (1 + PERSPECTIVE_FACTOR * t);
+            return {
+                x: VANISHING_POINT_X + (x - VANISHING_POINT_X) * scale,
+                y: HORIZON_Y + (y - HORIZON_Y) * scale
+            };
+        }
+
+        // Define the curve shape in world coordinates
+        function worldCurveAt(t) {
+            const baseY = lerp(HORIZON_Y, height, t);
+            const amplitude = PATH_BASE_AMPLITUDE * t;
+            const x = VANISHING_POINT_X + Math.sin(t * Math.PI * 2) * amplitude;
+            return { x, y: baseY };
+        }
+
+        // Get screen coordinates for a point on the curve
         function curveAt(t) {
-            // t goes from 0 (horizon) to 1 (bottom)
-            const y = lerp(horizonY, startY, t);
-            
-            // Add side-to-side wave motion
-            const waveAmplitude = width * 0.15;
-            const x = startX + Math.sin(t * Math.PI * 2) * waveAmplitude;
-            
-            return { x, y };
+            const worldPos = worldCurveAt(t);
+            const perspectiveT = 1 - t;
+            return applyPerspective(worldPos.x, worldPos.y, perspectiveT);
         }
 
-        // Helper function to get curve control points for drawing
-        function getCurveControlPoints(t1, t2) {
-            const p1 = curveAt(t1);
-            const p2 = curveAt(t2);
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
+        // Update dots based on scroll progress
+        function updateDots() {
+            // Remove old dots
+            const oldDots = svg.querySelectorAll('.dot');
+            oldDots.forEach(dot => dot.remove());
             
-            // Calculate control points that follow the wave
-            const t1_ahead = t1 + 0.1;
-            const t2_back = t2 - 0.1;
-            const tangent1 = curveAt(t1_ahead);
-            const tangent2 = curveAt(t2_back);
-            
-            // Use tangent points to guide control points
-            const cp1x = p1.x + (tangent1.x - p1.x) * 0.5;
-            const cp2x = p2.x - (p2.x - tangent2.x) * 0.5;
-            const cp1y = Math.max(p1.y + dy * 0.25, MIN_Y);
-            const cp2y = Math.max(p1.y + dy * 0.75, MIN_Y);
-            
-            return { p1, p2, cp1x, cp1y, cp2x, cp2y };
-        }
-
-        // Initialize dots with staggered parameters
-        function initDots(count) {
-            dots = [];
-            for (let i = 0; i < count; i++) {
-                dots.push({
-                    t: i * BASE_SPACING,
-                    speed: DOT_SPEED,
-                    number: count - i - 1
-                });
+            // Calculate dot positions
+            const numDots = Math.ceil(1.2 / DOT_SPACING);  // Number of dots to show
+            for (let i = 0; i < numDots; i++) {
+                // Calculate t value for this dot
+                let t = (scrollProgress + (i * DOT_SPACING)) % 1.2;
+                
+                // Only show dots within our view range
+                if (t >= 0 && t <= 1.2) {
+                    const pos = curveAt(Math.max(0, Math.min(1, t)));
+                    const scale = 0.5 + Math.max(0, t);
+                    const dotSize = 6 * scale;
+                    
+                    // Calculate opacity - fade out as t approaches 1
+                    const opacity = t >= 0.95 ? (1 - (t - 0.95) / 0.05) : 1;
+                    
+                    // Create dot
+                    const dotElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    dotElement.setAttribute('cx', pos.x);
+                    dotElement.setAttribute('cy', pos.y);
+                    dotElement.setAttribute('r', dotSize);
+                    dotElement.setAttribute('class', 'dot');
+                    dotElement.style.opacity = Math.max(0, opacity);
+                    
+                    svg.appendChild(dotElement);
+                }
             }
         }
 
-        function updateDots() {
-            // Remove old dots and labels
-            const oldDots = svg.querySelectorAll('.control-dot');
-            const oldLabels = svg.querySelectorAll('.dot-label');
-            oldDots.forEach(dot => dot.remove());
-            oldLabels.forEach(label => label.remove());
-
-            // Update and draw dots
-            dots.forEach((dot, i) => {
-                // Calculate position on curve
-                const pos = curveAt(dot.t);
-                
-                // Create dot
-                const dotElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                dotElement.setAttribute('cx', pos.x);
-                dotElement.setAttribute('cy', pos.y);
-                dotElement.setAttribute('r', '6');
-                dotElement.setAttribute('fill', 'red');
-                dotElement.classList.add('control-dot');
-                
-                // Add number label
-                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute('x', pos.x + 15);
-                text.setAttribute('y', pos.y);
-                text.setAttribute('fill', 'white');
-                text.setAttribute('font-size', '12px');
-                text.textContent = dot.number;
-                text.classList.add('dot-label');
-                
-                svg.appendChild(dotElement);
-                svg.appendChild(text);
-            });
-
-            // Add fixed endpoint dots
-            const bottomDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            bottomDot.setAttribute('cx', startX);
-            bottomDot.setAttribute('cy', startY);
-            bottomDot.setAttribute('r', '6');
-            bottomDot.setAttribute('fill', 'yellow');
-            bottomDot.classList.add('control-dot');
-            
-            const topDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            topDot.setAttribute('cx', endX);
-            topDot.setAttribute('cy', horizonY);
-            topDot.setAttribute('r', '6');
-            topDot.setAttribute('fill', 'yellow');
-            topDot.classList.add('control-dot');
-            
-            svg.appendChild(bottomDot);
-            svg.appendChild(topDot);
-        }
-
+        // Update path with perspective
         function updatePath() {
-            // Draw path using many small line segments
-            const steps = 100;  // More steps for smoother curve
-            let d = `M ${startX} ${startY}`;
+            const steps = 100;
+            let d = '';
             
-            for (let i = 1; i <= steps; i++) {
+            for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
-                const { x, y } = curveAt(1 - t);  // Invert t to draw from bottom to top
-                d += ` L ${x},${y}`;
+                const pos = curveAt(t);
+                d += (i === 0 ? 'M' : 'L') + ` ${pos.x},${pos.y}`;
             }
             
             path.setAttribute('d', d);
         }
 
         // Initialize
-        initDots(MAX_ACTIVE_DOTS);
+        let scrollProgress = 0;
         updatePath();
         updateDots();
 
-        // Add wheel event listener
+        // Scroll handler
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
             
-            // Update scroll progress
-            scrollProgress = Math.max(0, Math.min(scrollProgress + e.deltaY * SCROLL_SENSITIVITY, MAX_SCROLL));
-            
-            // Move dots based on scroll
-            if (e.deltaY > 0) {  // Only process when scrolling down
-                // Check if we need to add a new dot
-                const bottomDot = dots[0];
-                if (bottomDot && bottomDot.t >= NEW_DOT_THRESHOLD && dots.length < MAX_ACTIVE_DOTS) {
-                    // Add new dot at the top
-                    dots.push({
-                        t: 0,
-                        speed: DOT_SPEED,
-                        number: dots[dots.length - 1].number + 1
-                    });
-                }
-
-                // Move all dots
-                dots.forEach(dot => {
-                    dot.t += dot.speed;
-                });
-
-                // Remove dots that have exited
-                dots = dots.filter(dot => dot.t < EXIT_THRESHOLD);
-            } else {
-                // When scrolling up, just keep dots at the top
-                dots.forEach(dot => {
-                    dot.t = Math.max(0, dot.t + dot.speed);
-                });
-            }
+            const delta = e.deltaY * SCROLL_SENSITIVITY * 0.001;
+            scrollProgress = ((scrollProgress + delta) % 1.2 + 1.2) % 1.2;  // Keep scrollProgress within [0, 1.2]
             
             updateDots();
         }, { passive: false });
-
-        // Add slider functionality
-        const slider = document.getElementById('pointSlider');
-        const pointCount = document.getElementById('pointCount');
-        
-        slider.addEventListener('input', (e) => {
-            const count = parseInt(e.target.value);
-            pointCount.textContent = count;
-            scrollProgress = 0; // Reset scroll progress when changing points
-            initDots(count);
-            updatePath();
-            updateDots();
-        });
-
-        // Add guide lines and dots with dragging functionality
-        let isDragging = false;
-        let dragPoint = null;
-
-        function createGuideLine(point1, point2) {
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute('x1', point1.x);
-            line.setAttribute('y1', point1.y);
-            line.setAttribute('x2', point2.x);
-            line.setAttribute('y2', point2.y);
-            line.setAttribute('stroke', '#666');
-            line.setAttribute('stroke-width', '1');
-            return line;
-        }
-
-        function updateGuideLines() {
-            // Remove old guide lines
-            const oldLines = svg.querySelectorAll('.guide-line');
-            oldLines.forEach(line => line.remove());
-
-            // Add new guide lines
-            for (let i = 0; i < controlPoints.length - 1; i++) {
-                const line = createGuideLine(controlPoints[i], controlPoints[i + 1]);
-                line.classList.add('guide-line');
-                svg.appendChild(line);
-            }
-        }
-
-        function createDot(point, index) {
-            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            const isEndpoint = index === 0 || index === controlPoints.length - 1;
-            
-            dot.setAttribute('cx', point.x);
-            dot.setAttribute('cy', point.y);
-            dot.setAttribute('r', '6');
-            dot.setAttribute('fill', isEndpoint ? 'yellow' : 'red');
-            
-            // Add number label next to dot (except endpoints)
-            if (!isEndpoint) {
-                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute('x', point.x + 15);
-                text.setAttribute('y', point.y);
-                text.setAttribute('fill', 'white');
-                text.setAttribute('font-size', '12px');
-                // Number from bottom up (index - 1 since we skip the bottom yellow dot)
-                text.textContent = index - 1;
-                text.classList.add('dot-label');
-                svg.appendChild(text);
-                
-                dot.style.cursor = 'move';
-                dot.addEventListener('mousedown', (e) => {
-                    isDragging = true;
-                    dragPoint = index;
-                    dot.setAttribute('r', '8');
-                });
-            }
-            
-            return dot;
-        }
-
-        // Add mouse event listeners to SVG
-        svg.addEventListener('mousemove', (e) => {
-            if (isDragging && dragPoint !== null) {
-                const rect = svg.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = Math.min(Math.max(e.clientY - rect.top, MIN_Y), startY);
-                
-                // Update control point position
-                controlPoints[dragPoint].x = x;
-                controlPoints[dragPoint].y = y;
-                
-                // Update initial positions for proper scaling
-                controlPoints[dragPoint].initialX = x;
-                controlPoints[dragPoint].initialY = y;
-                
-                // Update path and visual elements
-                updatePath();
-                updateGuideLines();
-                updateDots();
-            }
-        });
-
-        svg.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                dragPoint = null;
-                // Reset dot sizes
-                const dots = svg.querySelectorAll('.control-dot');
-                dots.forEach(dot => dot.setAttribute('r', '6'));
-            }
-        });
 
         // Helper function for linear interpolation
         function lerp(start, end, t) {
