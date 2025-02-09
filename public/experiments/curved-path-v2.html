@@ -209,56 +209,73 @@
 
         // Calculate safe maximums based on viewport and other controls
         function updateControlLimits() {
-            // Base maximum values that don't change with other controls
-            const baseMaxAmplitude = Math.min(0.3, width / 2500);
-            const baseMaxFreq = Math.min(4, width / 600);
-            const baseMaxLookAhead = Math.min(0.4, width / 2500);
-            const baseMaxSecondary = Math.min(0.8, width / 2000);
-            const baseMaxTertiary = Math.min(0.6, width / 2000);
+            // Base maximum amplitude as percentage of viewport width
+            const baseMaxAmplitude = Math.min(0.3, width / 2500);  // More conservative base
             
-            // Only adjust current values if they would exceed safe limits
+            // Calculate combined effect of all wave controls
             const totalWaveStrength = parseFloat(controls.secondary.value) + parseFloat(controls.tertiary.value);
+            const combinedWaveFactor = 1 / Math.max(1, totalWaveStrength * 2);
             
-            // Check amplitude safety
-            const currentAmplitude = parseFloat(controls.amplitude.value);
-            const freqFactor = controls.frequency.value > 2 ? 1 / Math.max(1, controls.frequency.value * 1.5) : 1;
-            const safeAmplitude = baseMaxAmplitude * freqFactor;
+            // Adjust amplitude max based on all factors
+            const freqFactor = 1 / Math.max(1, controls.frequency.value * 1.5);
+            const lookAheadFactor = 1 / Math.max(1, controls.lookAhead.value * 3);
+            const safeAmplitude = baseMaxAmplitude * freqFactor * lookAheadFactor * combinedWaveFactor;
             
-            if (currentAmplitude > safeAmplitude) {
+            // Update amplitude control
+            controls.amplitude.max = safeAmplitude.toFixed(2);
+            if (parseFloat(controls.amplitude.value) > safeAmplitude) {
                 controls.amplitude.value = safeAmplitude;
                 controls.amplitude.nextElementSibling.textContent = safeAmplitude.toFixed(2);
             }
-            controls.amplitude.max = baseMaxAmplitude;
             
-            // Check look-ahead safety
-            const currentLookAhead = parseFloat(controls.lookAhead.value);
-            const lookAheadDanger = controls.amplitude.value * controls.frequency.value * 2 + totalWaveStrength;
-            const safeLookAhead = lookAheadDanger > 2 ? baseMaxLookAhead / lookAheadDanger : baseMaxLookAhead;
+            // Adjust frequency max based on viewport and other factors
+            const baseMaxFreq = Math.min(3, width / 600);  // More conservative base
+            const amplitudeFactor = 1 / Math.max(1, controls.amplitude.value * 4);
+            const wavesFactor = 1 / Math.max(1, totalWaveStrength * 1.5);
+            const safeFreq = baseMaxFreq * amplitudeFactor * wavesFactor;
             
-            if (currentLookAhead > safeLookAhead) {
+            // Update frequency control
+            controls.frequency.max = safeFreq.toFixed(1);
+            if (parseFloat(controls.frequency.value) > safeFreq) {
+                controls.frequency.value = safeFreq;
+                controls.frequency.nextElementSibling.textContent = safeFreq.toFixed(1);
+            }
+            
+            // Adjust look-ahead based on all factors
+            const baseMaxLookAhead = Math.min(0.4, width / 2500);  // More conservative base
+            const combinedFactor = 1 / Math.max(1, (controls.amplitude.value * controls.frequency.value * 2) + totalWaveStrength);
+            const safeLookAhead = baseMaxLookAhead * combinedFactor;
+            
+            // Update look-ahead control
+            controls.lookAhead.max = safeLookAhead.toFixed(2);
+            if (parseFloat(controls.lookAhead.value) > safeLookAhead) {
                 controls.lookAhead.value = safeLookAhead;
                 controls.lookAhead.nextElementSibling.textContent = safeLookAhead.toFixed(2);
             }
-            controls.lookAhead.max = baseMaxLookAhead;
             
-            // Secondary and tertiary waves only adjust if they would create unsafe combinations
-            const currentSecondary = parseFloat(controls.secondary.value);
-            const currentTertiary = parseFloat(controls.tertiary.value);
+            // Secondary and tertiary waves scale with all factors
+            const baseMaxSecondary = Math.min(0.8, width / 2000);  // More conservative base
+            const baseMaxTertiary = Math.min(0.6, width / 2000);   // Even more conservative for detail wave
             
-            if (totalWaveStrength > 1.5) {
-                const scaleFactor = 1.5 / totalWaveStrength;
-                const newSecondary = currentSecondary * scaleFactor;
-                const newTertiary = currentTertiary * scaleFactor;
-                
-                controls.secondary.value = newSecondary;
-                controls.tertiary.value = newTertiary;
-                controls.secondary.nextElementSibling.textContent = newSecondary.toFixed(2);
-                controls.tertiary.nextElementSibling.textContent = newTertiary.toFixed(2);
+            const mainFactor = 1 / Math.max(1, controls.amplitude.value * 3);
+            const freqWaveFactor = 1 / Math.max(1, controls.frequency.value * 2);
+            
+            // Calculate safe values considering interdependencies
+            const safeSecondary = baseMaxSecondary * mainFactor * freqWaveFactor;
+            const safeTertiary = baseMaxTertiary * mainFactor * freqWaveFactor;
+            
+            // Update secondary and tertiary controls
+            controls.secondary.max = safeSecondary.toFixed(2);
+            controls.tertiary.max = safeTertiary.toFixed(2);
+            
+            if (parseFloat(controls.secondary.value) > safeSecondary) {
+                controls.secondary.value = safeSecondary;
+                controls.secondary.nextElementSibling.textContent = safeSecondary.toFixed(2);
             }
-            
-            controls.secondary.max = baseMaxSecondary;
-            controls.tertiary.max = baseMaxTertiary;
-            controls.frequency.max = baseMaxFreq;
+            if (parseFloat(controls.tertiary.value) > safeTertiary) {
+                controls.tertiary.value = safeTertiary;
+                controls.tertiary.nextElementSibling.textContent = safeTertiary.toFixed(2);
+            }
         }
 
         // Update value displays and limits
@@ -423,6 +440,31 @@
             }
         }
 
+        // Calculate normal offset point for parallel path
+        function getNormalOffsetPoint(t, offset) {
+            // Get two points close together to estimate slope
+            const tPrev = Math.max(0, t - 0.001);
+            const pPrev = curveAt(tPrev);
+            const pCur = curveAt(t);
+            
+            // Calculate the derivative (slope)
+            const dx = pCur.x - pPrev.x;
+            const dy = pCur.y - pPrev.y;
+            
+            // Get length for normalization
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            // Calculate normal vector (rotate 90° CCW)
+            const nx = -dy / len;
+            const ny = dx / len;
+            
+            // Apply offset in normal direction
+            return {
+                x: pCur.x + nx * offset,
+                y: pCur.y + ny * offset
+            };
+        }
+
         // Update path with perspective
         function updatePath() {
             const steps = 100;
@@ -434,16 +476,12 @@
                 const t = i / steps;
                 const pos = curveAt(t);
                 
-                // Calculate a very gradual offset that starts from zero
-                // Linear increase from horizon to bottom
-                const offsetStrength = t;  // Simple linear increase
+                // Calculate offset that grows from vanishing point
+                const offsetStrength = t;
                 const currentOffset = BASE_OFFSET * offsetStrength;
                 
-                // Calculate the parallel position
-                const parallelPos = {
-                    x: pos.x + currentOffset,
-                    y: pos.y
-                };
+                // Get parallel point using normal offset
+                const parallelPos = getNormalOffsetPoint(t, currentOffset);
                 
                 // Ensure both paths exactly hit the vanishing point at t=0
                 if (t === 0) {
@@ -458,10 +496,7 @@
             // Add final points to ensure paths reach bottom of screen
             const bottomY = height;
             const mainBottom = worldCurveAt(1);
-            const parallelBottom = {
-                x: mainBottom.x + BASE_OFFSET,
-                y: bottomY
-            };
+            const parallelBottom = getNormalOffsetPoint(1, BASE_OFFSET);
             
             d += ` L ${mainBottom.x},${bottomY}`;
             dParallel += ` L ${parallelBottom.x},${bottomY}`;
