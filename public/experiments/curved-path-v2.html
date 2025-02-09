@@ -457,10 +457,10 @@
             const SECONDARY_FREQUENCY = baseFreq * 0.5;
             const TERTIARY_FREQUENCY = baseFreq * 2;
             
-            // Calculate wave phases based on scroll position
-            const mainPhase = scrollProgress * WAVE_FREQUENCY;
-            const secondaryPhase = scrollProgress * SECONDARY_FREQUENCY * 0.7;
-            const tertiaryPhase = scrollProgress * TERTIARY_FREQUENCY * 1.3;
+            // Calculate wave phases based on scroll progress
+            const mainPhase = -scrollProgress * WAVE_FREQUENCY;
+            const secondaryPhase = -scrollProgress * SECONDARY_FREQUENCY * 0.7;
+            const tertiaryPhase = -scrollProgress * TERTIARY_FREQUENCY * 1.3;
             
             const lookAheadPhase = mainPhase + WAVE_FREQUENCY * 0.25;
             const nextDirection = Math.cos(lookAheadPhase);
