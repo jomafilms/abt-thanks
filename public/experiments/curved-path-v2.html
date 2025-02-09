@@ -21,6 +21,18 @@
             stroke-width: 2;
             stroke-linecap: round;
         }
+        .path-parallel {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 2;
+            stroke-linecap: round;
+            opacity: 0.5;
+        }
+        .horizon-line {
+            stroke: #D4A373;
+            stroke-width: 1;
+            opacity: 0.3;
+        }
         .dot {
             fill: #D4A373;
             transition: opacity 0.2s ease-out;
@@ -155,7 +167,9 @@
     </div>
 
     <svg id="scene">
-        <!-- We'll draw a single curved line from bottom to top -->
+        <line class="horizon-line" x1="0" y1="0" x2="0" y2="0"/>
+        <path class="path-parallel"/>
+        <path class="path"/>
     </svg>
 
     <script>
@@ -163,10 +177,24 @@
         const width = window.innerWidth;
         const height = window.innerHeight;
         
-        // Create the path
+        // Create the paths
         const svg = document.getElementById('scene');
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const pathParallel = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        
         path.setAttribute('class', 'path');
+        pathParallel.setAttribute('class', 'path-parallel');
+        horizonLine.setAttribute('class', 'horizon-line');
+        
+        // Set horizon line coordinates
+        horizonLine.setAttribute('x1', '0');
+        horizonLine.setAttribute('y1', height * 0.2);
+        horizonLine.setAttribute('x2', width);
+        horizonLine.setAttribute('y2', height * 0.2);
+        
+        svg.appendChild(horizonLine);
+        svg.appendChild(pathParallel);
         svg.appendChild(path);
         
         // Controls setup
@@ -308,17 +336,51 @@
         function updatePath() {
             const steps = 100;
             let d = '';
+            let dParallel = '';
+            const BASE_OFFSET = width * 0.05; // 5% of viewport width
             
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
                 const pos = curveAt(t);
-                d += (i === 0 ? 'M' : 'L') + ` ${pos.x},${pos.y}`;
+                
+                // Calculate a very gradual offset that starts from zero
+                // Linear increase from horizon to bottom
+                const offsetStrength = t;  // Simple linear increase
+                const currentOffset = BASE_OFFSET * offsetStrength;
+                
+                // Calculate the parallel position
+                const parallelPos = {
+                    x: pos.x + currentOffset,
+                    y: pos.y
+                };
+                
+                // Ensure both paths exactly hit the vanishing point at t=0
+                if (t === 0) {
+                    d += `M ${VANISHING_POINT_X},${HORIZON_Y}`;
+                    dParallel += `M ${VANISHING_POINT_X},${HORIZON_Y}`;
+                } else {
+                    d += (i === 1 ? 'L' : ' L') + ` ${pos.x},${pos.y}`;
+                    dParallel += (i === 1 ? 'L' : ' L') + ` ${parallelPos.x},${parallelPos.y}`;
+                }
             }
             
+            // Add final points to ensure paths reach bottom of screen
+            const bottomY = height;
+            const mainBottom = worldCurveAt(1);
+            const parallelBottom = {
+                x: mainBottom.x + BASE_OFFSET,
+                y: bottomY
+            };
+            
+            d += ` L ${mainBottom.x},${bottomY}`;
+            dParallel += ` L ${parallelBottom.x},${bottomY}`;
+            
             path.setAttribute('d', d);
+            pathParallel.setAttribute('d', dParallel);
         }
 
         // Initialize
+        let lastAngle = 0;
         let scrollProgress = 0;
         updatePath();
         updateDots();
