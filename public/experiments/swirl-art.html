@@ -273,7 +273,7 @@
     </style>
 </head>
 <body>
-    <button class="info-btn" onclick="showModal()">?</button>
+    <button class="info-btn" onclick="toggleModal()">?</button>
     <button class="controls-toggle" onclick="toggleControls()">⚙️</button>
     <div id="controls">
         <h3 style="margin-top: 0; color: #fff; text-align: center;">AI Swirl Art</h3>
@@ -528,8 +528,13 @@
 
         // Toggle animation on click
         document.addEventListener('click', (e) => {
+            // Don't toggle animation when interacting with any controls
             if (e.target.classList.contains('preset-btn') || 
-                e.target.classList.contains('slider') || 
+                e.target.classList.contains('slider') ||
+                e.target.classList.contains('controls-toggle') ||
+                e.target.classList.contains('info-btn') ||
+                e.target.closest('#controls') || // Exclude any element inside controls
+                e.target.closest('#infoModal') || // Exclude any element inside info modal
                 e.target.type === 'checkbox') return;
             autoAnimate = !autoAnimate;
             autoPlayCheckbox.checked = autoAnimate;
@@ -548,18 +553,25 @@
             document.body.style.overflow = '';
         }
 
-        // Close modal when clicking outside or on close button
+        function toggleModal() {
+            const modal = document.getElementById('infoModal');
+            if (modal.classList.contains('show')) {
+                hideModal();
+            } else {
+                showModal();
+            }
+        }
+
+        // Close modal when clicking outside
         window.addEventListener('mousedown', (e) => {
             const modal = document.getElementById('infoModal');
-            if (e.target === modal || e.target.classList.contains('modal-close')) {
+            if (e.target === modal) {
                 hideModal();
             }
         });
 
-        // Prevent modal from closing when clicking inside
-        document.querySelector('.modal-content').addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-        });
+        // Update info button to use toggle
+        document.querySelector('.info-btn').onclick = toggleModal;
 
         // Controls toggle function
         function toggleControls() {
