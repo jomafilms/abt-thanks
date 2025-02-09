@@ -84,6 +84,8 @@
         const POINT_ADD_INTERVAL = 1000;
         const MAX_ACTIVE_DOTS = 3;
         const MIN_Y = horizonY;
+        let animatingPoints = new Set();
+        const POINT_ANIMATION_DURATION = 2000; // Increased to match scroll speed better
 
         function generateControlPoints(count) {
             const points = [
@@ -118,27 +120,47 @@
         }
 
         function updateControlPointsPosition() {
+            // Calculate base progress for all points
+            const progress = Math.min(scrollProgress / MAX_SCROLL, 1);
+            
             // Skip first and last points (yellow dots)
             for (let i = 1; i < controlPoints.length - 1; i++) {
                 const point = controlPoints[i];
                 
-                // Calculate base progress - same for all points
-                const progress = Math.min(scrollProgress / MAX_SCROLL, 1);
-                
-                // Each point's individual progress depends on its position from bottom
-                // Points closer to bottom (higher index) will exit first
+                // Calculate individual point progress based on position from bottom
                 const pointsFromBottom = (controlPoints.length - 2) - (i - 1);
                 const pointProgress = progress * (1 + pointsFromBottom * 0.2);
-                
-                // Calculate scale that maintains curve shape until point reaches bottom
                 const scale = Math.max(0, 1 - pointProgress);
                 
-                // Move positions while maintaining curve shape
-                const xOffset = point.initialX - startX;
-                const yOffset = point.initialY - startY;
-                
-                point.x = startX + (xOffset * scale);
-                point.y = Math.max(startY + (yOffset * scale), MIN_Y);
+                if (animatingPoints.has(i)) {
+                    // For animating points, blend between horizon and target position
+                    const elapsed = Date.now() - point.startTime;
+                    // Slow down the animation to match scroll speed
+                    const animProgress = Math.min(elapsed / (POINT_ANIMATION_DURATION * 2), 1);
+                    
+                    // Calculate the position based on both animation and scroll progress
+                    const xOffset = point.targetX - startX;
+                    const yOffset = point.targetY - startY;
+                    
+                    // First move from horizon to target position
+                    const currentX = lerp(endX, point.targetX, animProgress);
+                    const currentY = lerp(horizonY, point.targetY, animProgress);
+                    
+                    // Then apply scroll movement
+                    point.x = startX + ((currentX - startX) * scale);
+                    point.y = Math.max(startY + ((currentY - startY) * scale), MIN_Y);
+                    
+                    if (animProgress >= 1) {
+                        animatingPoints.delete(i);
+                    }
+                } else {
+                    // Move positions while maintaining curve shape
+                    const xOffset = point.initialX - startX;
+                    const yOffset = point.initialY - startY;
+                    
+                    point.x = startX + (xOffset * scale);
+                    point.y = Math.max(startY + (yOffset * scale), MIN_Y);
+                }
             }
         }
 
@@ -158,33 +180,43 @@
         // Add wheel event listener
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
+            const prevProgress = scrollProgress;
             scrollProgress = Math.max(0, Math.min(scrollProgress + e.deltaY * SCROLL_SENSITIVITY, MAX_SCROLL));
             
             // Check if we should add a new point
             const now = Date.now();
             const activePoints = controlPoints.length - 2;
             
-            if (scrollProgress > 0 && // Only when scrolling down
+            if (scrollProgress > prevProgress && // Only when scrolling down
                 now - lastAddedPointTime > POINT_ADD_INTERVAL && 
-                activePoints < MAX_ACTIVE_DOTS) {
+                activePoints < MAX_ACTIVE_DOTS &&
+                animatingPoints.size === 0) { // Only add new point when no animations are running
                 
                 // Remove the current end point
                 controlPoints.pop();
                 
-                // Add new control point
+                // Calculate target position for new point
                 const lastPoint = controlPoints[controlPoints.length - 1];
                 const newY = Math.max(lastPoint.y - (height * 0.2), MIN_Y);
                 const prevPoint = controlPoints[controlPoints.length - 2];
                 const prevSide = prevPoint.x > startX ? 1 : -1;
                 const offset = 0.15;
-                const x = startX + (width * offset * -prevSide);
+                const targetX = startX + (width * offset * -prevSide);
                 
+                // Add new control point starting at horizon
+                const newPointIndex = controlPoints.length;
                 controlPoints.push({
-                    x: x,
-                    y: newY,
-                    initialX: x,
-                    initialY: newY
+                    x: endX, // Start at horizon point
+                    y: horizonY,
+                    targetX: targetX,
+                    targetY: newY,
+                    initialX: targetX,
+                    initialY: newY,
+                    startTime: now
                 });
+                
+                // Mark point as animating
+                animatingPoints.add(newPointIndex);
                 
                 // Add new end point at horizon
                 controlPoints.push({ 
@@ -262,7 +294,8 @@
                 text.setAttribute('y', point.y);
                 text.setAttribute('fill', 'white');
                 text.setAttribute('font-size', '12px');
-                text.textContent = index;
+                // Number from bottom up (index - 1 since we skip the bottom yellow dot)
+                text.textContent = index - 1;
                 text.classList.add('dot-label');
                 svg.appendChild(text);
                 
