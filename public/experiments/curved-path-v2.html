@@ -50,6 +50,7 @@
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
         const SCROLL_SENSITIVITY = 2.0;
+        const WAVE_FREQUENCY = Math.PI * 2;  // How many waves in one cycle
 
         // Convert world coordinates to screen coordinates with perspective
         function applyPerspective(x, y, t) {
@@ -63,8 +64,17 @@
         // Define the curve shape in world coordinates
         function worldCurveAt(t) {
             const baseY = lerp(HORIZON_Y, height, t);
+            
+            // Calculate wave phase based on scroll position
+            // This makes the waves appear to move towards the viewer
+            const phase = scrollProgress * WAVE_FREQUENCY;
+            
+            // Amplitude increases as the wave gets closer (higher t)
             const amplitude = PATH_BASE_AMPLITUDE * t;
-            const x = VANISHING_POINT_X + Math.sin(t * Math.PI * 2) * amplitude;
+            
+            // The wave pattern shifts based on both t and scroll position
+            const x = VANISHING_POINT_X + Math.sin(t * WAVE_FREQUENCY + phase) * amplitude;
+            
             return { x, y: baseY };
         }
 
@@ -136,6 +146,7 @@
             scrollProgress = ((scrollProgress + delta) % 1.2 + 1.2) % 1.2;  // Keep scrollProgress within [0, 1.2]
             
             updateDots();
+            updatePath();  // Need to update path each frame for the wave motion
         }, { passive: false });
 
         // Helper function for linear interpolation
