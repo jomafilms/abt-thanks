@@ -179,7 +179,6 @@
 
     <svg id="scene">
         <line class="horizon-line" x1="0" y1="0" x2="0" y2="0"/>
-        <path class="path-parallel"/>
         <path class="path"/>
     </svg>
 
@@ -191,11 +190,9 @@
         // Create the paths
         const svg = document.getElementById('scene');
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        const pathParallel = document.createElementNS("http://www.w3.org/2000/svg", "path");
         const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
         
         path.setAttribute('class', 'path');
-        pathParallel.setAttribute('class', 'path-parallel');
         horizonLine.setAttribute('class', 'horizon-line');
         
         // Set horizon line coordinates
@@ -205,7 +202,6 @@
         horizonLine.setAttribute('y2', height * 0.4);
         
         svg.appendChild(horizonLine);
-        svg.appendChild(pathParallel);
         svg.appendChild(path);
         
         // Controls setup
@@ -490,29 +486,6 @@
             }
         }
 
-        // Calculate normal offset point for parallel path
-        function getNormalOffsetPoint(t, offset) {
-            // Sample positions for slope calculation
-            const delta = 0.002;
-            const p1 = curveAt(Math.max(0, t - delta));
-            const p2 = curveAt(Math.min(1, t + delta));
-            
-            // Calculate normal vector (90° CW)
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            const nx = dy / len;
-            const ny = -dx / len;
-            
-            // Apply perspective-scaled offset from current point
-            const pCurrent = curveAt(t);
-            const perspectiveScale = 1 / (1 + PERSPECTIVE_FACTOR * (1 - t));
-            return {
-                x: pCurrent.x + nx * (offset / perspectiveScale),
-                y: pCurrent.y + ny * (offset / perspectiveScale)
-            };
-        }
-
         // Helper function to add debug text
         function addDebugText(x, y, text) {
             const debugText = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -527,8 +500,6 @@
         function updatePath() {
             const steps = 100;
             let d = '';
-            let dParallel = '';
-            const BASE_OFFSET = width * 0.04;
             
             // Clear existing paths and grid lines
             svg.innerHTML = '';
@@ -585,20 +556,14 @@
                 }
             }
             
-            // Store points for main and parallel paths
+            // Store points for main path
             const mainPoints = [];
-            const parallelPoints = [];
             
-            // Generate points for main and parallel paths
+            // Generate points for main path
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
                 const pos = curveAt(t);
                 mainPoints.push(pos);
-                
-                const offsetStrength = t;
-                const currentOffset = BASE_OFFSET * offsetStrength;
-                const parallelPos = getNormalOffsetPoint(t, currentOffset);
-                parallelPoints.push(parallelPos);
             }
             
             // Build main path
@@ -607,23 +572,11 @@
                 if (i > 0) d += ` L ${pos.x},${pos.y}`;
             });
             
-            // Build parallel path
-            dParallel = `M ${VANISHING_POINT_X},${HORIZON_Y}`;
-            parallelPoints.forEach((pos, i) => {
-                if (i > 0) dParallel += ` L ${pos.x},${pos.y}`;
-            });
-            
-            // Create and append paths
+            // Create and append path
             const mainPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            const parallelPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            
             mainPath.setAttribute('class', 'path');
-            parallelPath.setAttribute('class', 'path-parallel');
-            
             mainPath.setAttribute('d', d);
-            parallelPath.setAttribute('d', dParallel);
             
-            svg.appendChild(parallelPath);
             svg.appendChild(mainPath);
             
             // Update dots last so they're on top
