@@ -115,6 +115,17 @@
         .auto-scroll-label {
             font-size: 12px;
         }
+        .path-grid {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.3);
+            stroke-width: 1;
+            opacity: 0.4;
+        }
+        .debug-text {
+            fill: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -319,6 +330,8 @@
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
         const VIEWPORT_MARGIN = 50;
+        const NUM_GRID_LINES = 20; // Number of vertical grid lines on each side
+        const NUM_LATITUDE_LINES = 10; // Number of horizontal grid lines
 
         // Helper function to clamp a value between min and max
         function clamp(value, min, max) {
@@ -456,27 +469,90 @@
             };
         }
 
+        // Helper function to add debug text
+        function addDebugText(x, y, text) {
+            const debugText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            debugText.setAttribute('x', x);
+            debugText.setAttribute('y', y);
+            debugText.setAttribute('class', 'debug-text');
+            debugText.textContent = text;
+            svg.appendChild(debugText);
+        }
+
         // Update path with perspective
         function updatePath() {
             const steps = 100;
             let d = '';
             let dParallel = '';
-            const BASE_OFFSET = width * 0.04; // Slightly reduced base offset
+            const BASE_OFFSET = width * 0.04;
             
-            // Store points for smoothing
+            // Clear existing paths and grid lines
+            svg.innerHTML = '';
+            svg.appendChild(horizonLine);
+            
+            // Add latitude lines
+            for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
+                const t = i / NUM_LATITUDE_LINES;
+                const mt = 1 - t;
+                const y = lerp(HORIZON_Y, height, t * t); // Quadratic interpolation for perspective
+                
+                const latLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                latLine.setAttribute('x1', VANISHING_POINT_X - width * 0.4);
+                latLine.setAttribute('y1', y);
+                latLine.setAttribute('x2', VANISHING_POINT_X + width * 0.4);
+                latLine.setAttribute('y2', y);
+                latLine.setAttribute('class', 'path-grid');
+                latLine.setAttribute('stroke-dasharray', '4 4');
+                svg.appendChild(latLine);
+                
+                // Add percentage label
+                addDebugText(
+                    VANISHING_POINT_X + width * 0.42,
+                    y,
+                    `${(mt * 100).toFixed(0)}%`
+                );
+            }
+            
+            // Add vertical grid lines
+            const gridSpacing = width * 0.05;
+            for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
+                if (i === 0) continue; // Skip center line as it's our main path
+                
+                const xOffset = i * gridSpacing;
+                const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                let gridD = `M ${VANISHING_POINT_X + xOffset * 0.2} ${HORIZON_Y}`; // Start at horizon with compressed spacing
+                
+                for (let j = 0; j <= steps; j++) {
+                    const t = j / steps;
+                    const worldPos = worldCurveAt(t);
+                    // Scale offset more at bottom, less at top
+                    worldPos.x += xOffset * t; // Adjust x-offset based on perspective
+                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+                    gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
+                }
+                
+                gridPath.setAttribute('d', gridD);
+                gridPath.setAttribute('class', 'path-grid');
+                svg.appendChild(gridPath);
+                
+                // Add line number at bottom
+                if (i % 5 === 0) {
+                    addDebugText(VANISHING_POINT_X + xOffset, height - 10, i.toString());
+                }
+            }
+            
+            // Store points for main and parallel paths
             const mainPoints = [];
             const parallelPoints = [];
             
-            // Generate points
+            // Generate points for main and parallel paths
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
                 const pos = curveAt(t);
                 mainPoints.push(pos);
                 
-                // Calculate offset that grows from vanishing point
                 const offsetStrength = t;
                 const currentOffset = BASE_OFFSET * offsetStrength;
-                
                 const parallelPos = getNormalOffsetPoint(t, currentOffset);
                 parallelPoints.push(parallelPos);
             }
@@ -484,21 +560,30 @@
             // Build main path
             d = `M ${VANISHING_POINT_X},${HORIZON_Y}`;
             mainPoints.forEach((pos, i) => {
-                if (i > 0) {
-                    d += ` L ${pos.x},${pos.y}`;
-                }
+                if (i > 0) d += ` L ${pos.x},${pos.y}`;
             });
             
             // Build parallel path
             dParallel = `M ${VANISHING_POINT_X},${HORIZON_Y}`;
             parallelPoints.forEach((pos, i) => {
-                if (i > 0) {
-                    dParallel += ` L ${pos.x},${pos.y}`;
-                }
+                if (i > 0) dParallel += ` L ${pos.x},${pos.y}`;
             });
             
-            path.setAttribute('d', d);
-            pathParallel.setAttribute('d', dParallel);
+            // Create and append paths
+            const mainPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const parallelPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            
+            mainPath.setAttribute('class', 'path');
+            parallelPath.setAttribute('class', 'path-parallel');
+            
+            mainPath.setAttribute('d', d);
+            parallelPath.setAttribute('d', dParallel);
+            
+            svg.appendChild(parallelPath);
+            svg.appendChild(mainPath);
+            
+            // Update dots last so they're on top
+            updateDots();
         }
 
         // Initialize
