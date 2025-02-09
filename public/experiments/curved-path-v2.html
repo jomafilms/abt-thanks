@@ -173,6 +173,11 @@
                 <input type="range" id="sensitivity" min="0.5" max="4" step="0.1" value="2.0">
                 <div class="value-display">2.0</div>
             </div>
+            <div class="control-group">
+                <label>Path Width (%)</label>
+                <input type="range" id="pathWidth" min="10" max="40" step="1" value="25">
+                <div class="value-display">25</div>
+            </div>
             <div class="auto-scroll">
                 <button class="play-button" title="Toggle auto-scroll">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -219,7 +224,8 @@
             lookAhead: document.getElementById('lookAhead'),
             secondary: document.getElementById('secondary'),
             tertiary: document.getElementById('tertiary'),
-            sensitivity: document.getElementById('sensitivity')
+            sensitivity: document.getElementById('sensitivity'),
+            pathWidth: document.getElementById('pathWidth')
         };
 
         // Calculate safe maximums based on viewport and other controls
@@ -343,13 +349,18 @@
         let bounceOffset = 0;
 
         // Path width control
-        const pathWidthPercent = 25;  // 25% of viewport width
-        const pathHalfWidth = width * (pathWidthPercent / 100) / 2;
-        const linesInPathHalf = Math.ceil(pathHalfWidth / BASE_LINE_SPACING);
-        const EDGE_LINE_NUMBERS = {
-            left: -linesInPathHalf,
-            right: linesInPathHalf
-        };
+        function getPathWidth() {
+            return width * (parseFloat(controls.pathWidth.value) / 100);
+        }
+
+        function updatePathEdges() {
+            const pathHalfWidth = getPathWidth() / 2;
+            const linesInPathHalf = Math.ceil(pathHalfWidth / BASE_LINE_SPACING);
+            return {
+                left: -linesInPathHalf,
+                right: linesInPathHalf
+            };
+        }
 
         // Configuration loading
         let staticConfig = null;
@@ -556,6 +567,9 @@
             // Clear existing paths and grid lines
             svg.innerHTML = '';
             svg.appendChild(horizonLine);
+            
+            // Get current edge line numbers
+            const EDGE_LINE_NUMBERS = updatePathEdges();
             
             // Add latitude lines
             for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
