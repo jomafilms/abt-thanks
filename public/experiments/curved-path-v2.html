@@ -57,6 +57,8 @@
         // Create the path
         const svg = document.getElementById('scene');
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute('class', 'path');
+        svg.appendChild(path);  // Add path to SVG
         
         // Create horizon line
         const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -76,162 +78,153 @@
 
         // Initialize variables
         let controlPoints = [];
-        let initialControlPoints = [];
+        let dots = [];
         let scrollProgress = 0;
         const MAX_SCROLL = 1000;
         const SCROLL_SENSITIVITY = 0.5;
-        let lastAddedPointTime = 0;
-        const POINT_ADD_INTERVAL = 1000;
         const MAX_ACTIVE_DOTS = 3;
         const MIN_Y = horizonY;
-        let animatingPoints = new Set();
-        const POINT_ANIMATION_DURATION = 2000; // Increased to match scroll speed better
+        const BASE_SPACING = 0.2; // Parameter spacing between dots
+        const HORIZON_OFFSET = 20;
 
-        function generateControlPoints(count) {
-            const points = [
-                { x: startX, y: startY }  // Start point (yellow)
-            ];
+        // Define the curve shape
+        function curveAt(t) {
+            // t goes from 0 (horizon) to 1 (bottom)
+            const y = lerp(horizonY, startY, t);
             
-            // Generate control points for each curve section
-            const totalHeight = startY - horizonY; // Distance from bottom to horizon
-            const sectionHeight = totalHeight / (count + 1);
+            // Add side-to-side wave motion
+            const waveAmplitude = width * 0.15;
+            const x = startX + Math.sin(t * Math.PI * 2) * waveAmplitude;
             
+            return { x, y };
+        }
+
+        // Helper function to get curve control points for drawing
+        function getCurveControlPoints(t1, t2) {
+            const p1 = curveAt(t1);
+            const p2 = curveAt(t2);
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            
+            // Calculate control points that follow the wave
+            const t1_ahead = t1 + 0.1;
+            const t2_back = t2 - 0.1;
+            const tangent1 = curveAt(t1_ahead);
+            const tangent2 = curveAt(t2_back);
+            
+            // Use tangent points to guide control points
+            const cp1x = p1.x + (tangent1.x - p1.x) * 0.5;
+            const cp2x = p2.x - (p2.x - tangent2.x) * 0.5;
+            const cp1y = Math.max(p1.y + dy * 0.25, MIN_Y);
+            const cp2y = Math.max(p1.y + dy * 0.75, MIN_Y);
+            
+            return { p1, p2, cp1x, cp1y, cp2x, cp2y };
+        }
+
+        // Initialize dots with staggered parameters
+        function initDots(count) {
+            dots = [];
             for (let i = 0; i < count; i++) {
-                const y = Math.max(startY - sectionHeight * (i + 1), MIN_Y);
-                const side = i % 2 === 0 ? 1 : -1;
-                const offset = 0.15; // Fixed offset for consistent path
-                points.push({
-                    x: startX + (width * offset * side),
-                    y: y,
-                    initialX: startX + (width * offset * side),
-                    initialY: y
+                dots.push({
+                    t: i * BASE_SPACING,  // Stagger initial positions
+                    speed: 0.001,         // Base movement speed
+                    number: count - i - 1  // Number from bottom up
                 });
             }
-            
-            // Add horizon point
-            points.push({ 
-                x: endX, 
-                y: horizonY,
-                initialX: endX,
-                initialY: horizonY
+        }
+
+        function updateDots() {
+            // Remove old dots and labels
+            const oldDots = svg.querySelectorAll('.control-dot');
+            const oldLabels = svg.querySelectorAll('.dot-label');
+            oldDots.forEach(dot => dot.remove());
+            oldLabels.forEach(label => label.remove());
+
+            // Update and draw dots
+            dots.forEach((dot, i) => {
+                // Calculate position on curve
+                const pos = curveAt(dot.t);
+                
+                // Create dot
+                const dotElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                dotElement.setAttribute('cx', pos.x);
+                dotElement.setAttribute('cy', pos.y);
+                dotElement.setAttribute('r', '6');
+                dotElement.setAttribute('fill', 'red');
+                dotElement.classList.add('control-dot');
+                
+                // Add number label
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute('x', pos.x + 15);
+                text.setAttribute('y', pos.y);
+                text.setAttribute('fill', 'white');
+                text.setAttribute('font-size', '12px');
+                text.textContent = dot.number;
+                text.classList.add('dot-label');
+                
+                svg.appendChild(dotElement);
+                svg.appendChild(text);
             });
+
+            // Add fixed endpoint dots
+            const bottomDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            bottomDot.setAttribute('cx', startX);
+            bottomDot.setAttribute('cy', startY);
+            bottomDot.setAttribute('r', '6');
+            bottomDot.setAttribute('fill', 'yellow');
+            bottomDot.classList.add('control-dot');
             
-            return points;
+            const topDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            topDot.setAttribute('cx', endX);
+            topDot.setAttribute('cy', horizonY);
+            topDot.setAttribute('r', '6');
+            topDot.setAttribute('fill', 'yellow');
+            topDot.classList.add('control-dot');
+            
+            svg.appendChild(bottomDot);
+            svg.appendChild(topDot);
         }
 
-        function updateControlPointsPosition() {
-            // Calculate base progress for all points
-            const progress = Math.min(scrollProgress / MAX_SCROLL, 1);
+        function updatePath() {
+            // Draw path using many small line segments
+            const steps = 100;  // More steps for smoother curve
+            let d = `M ${startX} ${startY}`;
             
-            // Skip first and last points (yellow dots)
-            for (let i = 1; i < controlPoints.length - 1; i++) {
-                const point = controlPoints[i];
-                
-                // Calculate individual point progress based on position from bottom
-                const pointsFromBottom = (controlPoints.length - 2) - (i - 1);
-                const pointProgress = progress * (1 + pointsFromBottom * 0.2);
-                const scale = Math.max(0, 1 - pointProgress);
-                
-                if (animatingPoints.has(i)) {
-                    // For animating points, blend between horizon and target position
-                    const elapsed = Date.now() - point.startTime;
-                    // Slow down the animation to match scroll speed
-                    const animProgress = Math.min(elapsed / (POINT_ANIMATION_DURATION * 2), 1);
-                    
-                    // Calculate the position based on both animation and scroll progress
-                    const xOffset = point.targetX - startX;
-                    const yOffset = point.targetY - startY;
-                    
-                    // First move from horizon to target position
-                    const currentX = lerp(endX, point.targetX, animProgress);
-                    const currentY = lerp(horizonY, point.targetY, animProgress);
-                    
-                    // Then apply scroll movement
-                    point.x = startX + ((currentX - startX) * scale);
-                    point.y = Math.max(startY + ((currentY - startY) * scale), MIN_Y);
-                    
-                    if (animProgress >= 1) {
-                        animatingPoints.delete(i);
-                    }
-                } else {
-                    // Move positions while maintaining curve shape
-                    const xOffset = point.initialX - startX;
-                    const yOffset = point.initialY - startY;
-                    
-                    point.x = startX + (xOffset * scale);
-                    point.y = Math.max(startY + (yOffset * scale), MIN_Y);
-                }
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const { x, y } = curveAt(1 - t);  // Invert t to draw from bottom to top
+                d += ` L ${x},${y}`;
             }
+            
+            path.setAttribute('d', d);
         }
 
-        // Initialize with two control points
-        controlPoints = generateControlPoints(2);
-        initialControlPoints = JSON.parse(JSON.stringify(controlPoints));
-
-        // Set path attributes and add to SVG
-        path.setAttribute('class', 'path');
-        svg.appendChild(path);
-
-        // Initial render
+        // Initialize
+        initDots(MAX_ACTIVE_DOTS);
         updatePath();
-        updateGuideLines();
         updateDots();
 
         // Add wheel event listener
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const prevProgress = scrollProgress;
+            
+            // Update scroll progress
             scrollProgress = Math.max(0, Math.min(scrollProgress + e.deltaY * SCROLL_SENSITIVITY, MAX_SCROLL));
             
-            // Check if we should add a new point
-            const now = Date.now();
-            const activePoints = controlPoints.length - 2;
+            // Move dots based on scroll
+            dots.forEach(dot => {
+                dot.t += (e.deltaY > 0 ? dot.speed : -dot.speed);
+                
+                // Reset dot when it reaches bottom
+                if (dot.t >= 1) {
+                    dot.t = 0;
+                }
+                // Keep dot at top if scrolling up
+                if (dot.t < 0) {
+                    dot.t = 0;
+                }
+            });
             
-            if (scrollProgress > prevProgress && // Only when scrolling down
-                now - lastAddedPointTime > POINT_ADD_INTERVAL && 
-                activePoints < MAX_ACTIVE_DOTS &&
-                animatingPoints.size === 0) { // Only add new point when no animations are running
-                
-                // Remove the current end point
-                controlPoints.pop();
-                
-                // Calculate target position for new point
-                const lastPoint = controlPoints[controlPoints.length - 1];
-                const newY = Math.max(lastPoint.y - (height * 0.2), MIN_Y);
-                const prevPoint = controlPoints[controlPoints.length - 2];
-                const prevSide = prevPoint.x > startX ? 1 : -1;
-                const offset = 0.15;
-                const targetX = startX + (width * offset * -prevSide);
-                
-                // Add new control point starting at horizon
-                const newPointIndex = controlPoints.length;
-                controlPoints.push({
-                    x: endX, // Start at horizon point
-                    y: horizonY,
-                    targetX: targetX,
-                    targetY: newY,
-                    initialX: targetX,
-                    initialY: newY,
-                    startTime: now
-                });
-                
-                // Mark point as animating
-                animatingPoints.add(newPointIndex);
-                
-                // Add new end point at horizon
-                controlPoints.push({ 
-                    x: endX, 
-                    y: horizonY,
-                    initialX: endX,
-                    initialY: horizonY
-                });
-                
-                lastAddedPointTime = now;
-            }
-            
-            updateControlPointsPosition();
-            updatePath();
-            updateGuideLines();
             updateDots();
         }, { passive: false });
 
@@ -243,10 +236,8 @@
             const count = parseInt(e.target.value);
             pointCount.textContent = count;
             scrollProgress = 0; // Reset scroll progress when changing points
-            controlPoints = generateControlPoints(count);
-            initialControlPoints = JSON.parse(JSON.stringify(controlPoints));
+            initDots(count);
             updatePath();
-            updateGuideLines();
             updateDots();
         });
 
@@ -310,31 +301,20 @@
             return dot;
         }
 
-        function updateDots() {
-            // Remove old dots and labels
-            const oldDots = svg.querySelectorAll('.control-dot');
-            const oldLabels = svg.querySelectorAll('.dot-label');
-            oldDots.forEach(dot => dot.remove());
-            oldLabels.forEach(label => label.remove());
-
-            // Add new dots
-            controlPoints.forEach((point, i) => {
-                const dot = createDot(point, i);
-                dot.classList.add('control-dot');
-                svg.appendChild(dot);
-            });
-        }
-
         // Add mouse event listeners to SVG
         svg.addEventListener('mousemove', (e) => {
             if (isDragging && dragPoint !== null) {
                 const rect = svg.getBoundingClientRect();
                 const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
+                const y = Math.min(Math.max(e.clientY - rect.top, MIN_Y), startY);
                 
                 // Update control point position
                 controlPoints[dragPoint].x = x;
                 controlPoints[dragPoint].y = y;
+                
+                // Update initial positions for proper scaling
+                controlPoints[dragPoint].initialX = x;
+                controlPoints[dragPoint].initialY = y;
                 
                 // Update path and visual elements
                 updatePath();
@@ -352,41 +332,6 @@
                 dots.forEach(dot => dot.setAttribute('r', '6'));
             }
         });
-
-        function updatePath() {
-            const points = controlPoints;
-            let d = `M ${points[0].x} ${points[0].y}`;
-            
-            // Create a series of connected cubic Bezier curves
-            for (let i = 0; i < points.length - 1; i++) {
-                const current = points[i];
-                const next = points[i + 1];
-                const isLast = i === points.length - 2;
-                
-                // Calculate control points for this segment
-                const dy = next.y - current.y;
-                // Ensure control points never go above horizon
-                const cp1y = Math.max(current.y + dy * 0.25, MIN_Y);
-                const cp2y = Math.max(current.y + dy * 0.75, MIN_Y);
-                
-                if (isLast) {
-                    // For the last segment, create a smooth curve to top point
-                    const dx = next.x - current.x;
-                    const cp1x = current.x;
-                    const cp2x = current.x + dx * (dx > 0 ? 0.75 : 0.25);
-                    d += ` C ${cp1x},${cp1y},
-                           ${cp2x},${cp2y},
-                           ${next.x},${Math.max(next.y, MIN_Y)}`;
-                } else {
-                    // For all other segments, use consistent outward curves
-                    d += ` C ${current.x},${cp1y},
-                           ${next.x},${cp2y},
-                           ${next.x},${Math.max(next.y, MIN_Y)}`;
-                }
-            }
-            
-            path.setAttribute('d', d);
-        }
 
         // Helper function for linear interpolation
         function lerp(start, end, t) {
