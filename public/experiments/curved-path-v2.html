@@ -81,11 +81,14 @@
         let dots = [];
         let scrollProgress = 0;
         const MAX_SCROLL = 1000;
-        const SCROLL_SENSITIVITY = 0.5;
+        const SCROLL_SENSITIVITY = 2.0;
         const MAX_ACTIVE_DOTS = 3;
         const MIN_Y = horizonY;
-        const BASE_SPACING = 0.2; // Parameter spacing between dots
+        const BASE_SPACING = 0.2;
         const HORIZON_OFFSET = 20;
+        const DOT_SPEED = 0.003;
+        const NEW_DOT_THRESHOLD = 0.85;  // When to add a new dot
+        const EXIT_THRESHOLD = 1.0;      // When to remove the bottom dot
 
         // Define the curve shape
         function curveAt(t) {
@@ -126,9 +129,9 @@
             dots = [];
             for (let i = 0; i < count; i++) {
                 dots.push({
-                    t: i * BASE_SPACING,  // Stagger initial positions
-                    speed: 0.001,         // Base movement speed
-                    number: count - i - 1  // Number from bottom up
+                    t: i * BASE_SPACING,
+                    speed: DOT_SPEED,
+                    number: count - i - 1
                 });
             }
         }
@@ -212,18 +215,31 @@
             scrollProgress = Math.max(0, Math.min(scrollProgress + e.deltaY * SCROLL_SENSITIVITY, MAX_SCROLL));
             
             // Move dots based on scroll
-            dots.forEach(dot => {
-                dot.t += (e.deltaY > 0 ? dot.speed : -dot.speed);
-                
-                // Reset dot when it reaches bottom
-                if (dot.t >= 1) {
-                    dot.t = 0;
+            if (e.deltaY > 0) {  // Only process when scrolling down
+                // Check if we need to add a new dot
+                const bottomDot = dots[0];
+                if (bottomDot && bottomDot.t >= NEW_DOT_THRESHOLD && dots.length < MAX_ACTIVE_DOTS) {
+                    // Add new dot at the top
+                    dots.push({
+                        t: 0,
+                        speed: DOT_SPEED,
+                        number: dots[dots.length - 1].number + 1
+                    });
                 }
-                // Keep dot at top if scrolling up
-                if (dot.t < 0) {
-                    dot.t = 0;
-                }
-            });
+
+                // Move all dots
+                dots.forEach(dot => {
+                    dot.t += dot.speed;
+                });
+
+                // Remove dots that have exited
+                dots = dots.filter(dot => dot.t < EXIT_THRESHOLD);
+            } else {
+                // When scrolling up, just keep dots at the top
+                dots.forEach(dot => {
+                    dot.t = Math.max(0, dot.t + dot.speed);
+                });
+            }
             
             updateDots();
         }, { passive: false });
