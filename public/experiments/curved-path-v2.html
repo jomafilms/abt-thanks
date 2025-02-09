@@ -435,39 +435,24 @@
 
         // Calculate normal offset point for parallel path
         function getNormalOffsetPoint(t, offset) {
-            // Increase sampling distance near bottom for smoother transitions
-            const baseDelta = 0.002;
-            const bottomScale = Math.min(1 + t * 2, 3); // Scale up sampling near bottom
-            const delta = baseDelta * bottomScale;
+            // Sample positions for slope calculation
+            const delta = 0.002;
+            const p1 = curveAt(Math.max(0, t - delta));
+            const p2 = curveAt(Math.min(1, t + delta));
             
-            // Sample positions around t, clamping to valid range
-            const tBefore = Math.max(0, t - delta);
-            const tAfter = Math.min(1, t + delta);
-            
-            // Get positions for slope calculation
-            const pBefore = curveAt(tBefore);
-            const pAfter = curveAt(tAfter);
-            const pCurrent = curveAt(t);
-            
-            // Calculate slope using the neighborhood
-            const dx = pAfter.x - pBefore.x;
-            const dy = pAfter.y - pBefore.y;
-            
-            // Get length for normalization
+            // Calculate normal vector (90° CW)
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
             const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            
-            // Calculate normal vector (rotate 90° CW to stay on right side)
             const nx = dy / len;
             const ny = -dx / len;
             
-            // Apply perspective scaling to the offset
+            // Apply perspective-scaled offset from current point
+            const pCurrent = curveAt(t);
             const perspectiveScale = 1 / (1 + PERSPECTIVE_FACTOR * (1 - t));
-            const scaledOffset = offset / perspectiveScale;
-            
-            // Apply offset in normal direction from current point
             return {
-                x: pCurrent.x + nx * scaledOffset,
-                y: pCurrent.y + ny * scaledOffset
+                x: pCurrent.x + nx * (offset / perspectiveScale),
+                y: pCurrent.y + ny * (offset / perspectiveScale)
             };
         }
 
