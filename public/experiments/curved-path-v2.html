@@ -20,6 +20,14 @@
             stroke: #D4A373;
             stroke-width: 2;
             stroke-linecap: round;
+            opacity: 0.5;
+        }
+        .path-edge {
+            fill: none;
+            stroke: #D4A373;
+            stroke-width: 3;
+            stroke-linecap: round;
+            opacity: 0.8;
         }
         .path-parallel {
             fill: none;
@@ -326,9 +334,53 @@
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
         const VIEWPORT_MARGIN = 50;
-        const NUM_GRID_LINES = 20;
+        const BASE_LINE_SPACING = width * 0.05;  // 5% of viewport width
+        const horizonRatio = HORIZON_Y / height;
+        const viewportOverflow = 2 + (1 - horizonRatio) * 2;
+        const totalWidth = width * viewportOverflow;
+        const NUM_GRID_LINES = Math.ceil((totalWidth / BASE_LINE_SPACING) / 2);  // Divide by 2 since we're counting from center
         const NUM_LATITUDE_LINES = 10;
         let bounceOffset = 0;
+
+        // Path width control
+        const pathWidthPercent = 25;  // 25% of viewport width
+        const pathHalfWidth = width * (pathWidthPercent / 100) / 2;
+        const linesInPathHalf = Math.ceil(pathHalfWidth / BASE_LINE_SPACING);
+        const EDGE_LINE_NUMBERS = {
+            left: -linesInPathHalf,
+            right: linesInPathHalf
+        };
+
+        // Configuration loading
+        let staticConfig = null;
+        let markersWithNames = [];
+
+        // Function to load and merge configuration
+        async function loadConfiguration() {
+            try {
+                // Load static configuration
+                const staticResponse = await fetch('static.json');
+                staticConfig = await staticResponse.json();
+
+                // Load names
+                const namesResponse = await fetch('names.json');
+                const namesData = await namesResponse.json();
+
+                // Assign names to available markers
+                markersWithNames = staticConfig.markers.map(marker => {
+                    if (marker.canReceiveName && namesData.names.length > 0) {
+                        const nextName = namesData.names.shift();
+                        return { ...marker, name: nextName.name };
+                    }
+                    return marker;
+                });
+
+                // Initial scene creation
+                updatePath();
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+            }
+        }
 
         // Helper function for linear interpolation
         function lerp(start, end, t) {
@@ -528,8 +580,9 @@
                 );
             }
             
-            // Add vertical grid lines
-            const gridSpacing = width * 0.05;
+            // Add vertical grid lines and store line info
+            const lines = [];
+            const gridSpacing = BASE_LINE_SPACING;
             for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
                 if (i === 0) continue; // Skip center line as it's our main path
                 
@@ -546,9 +599,20 @@
                     gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
                 }
                 
+                // Determine if this is within the main path boundaries
+                const isInMainPath = Math.abs(i) < EDGE_LINE_NUMBERS.right;
+                
                 gridPath.setAttribute('d', gridD);
-                gridPath.setAttribute('class', 'path-grid');
+                gridPath.setAttribute('class', isInMainPath ? 'path-grid' : 'path-grid');
                 svg.appendChild(gridPath);
+                
+                // Store line info
+                lines.push({
+                    number: i,
+                    xOffset,
+                    d: gridD,
+                    isInMainPath
+                });
                 
                 // Add line number at bottom
                 if (i % 5 === 0) {
@@ -572,12 +636,75 @@
                 if (i > 0) d += ` L ${pos.x},${pos.y}`;
             });
             
-            // Create and append path
+            // Create and append center path
             const mainPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
             mainPath.setAttribute('class', 'path');
             mainPath.setAttribute('d', d);
-            
             svg.appendChild(mainPath);
+            
+            // Add edge paths
+            [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
+                const edgeLine = lines.find(line => line.number === edgeNum);
+                if (!edgeLine) return;
+
+                const edgePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                edgePath.setAttribute('d', edgeLine.d);
+                edgePath.setAttribute('class', 'path-edge');
+                svg.appendChild(edgePath);
+            });
+            
+            // Add markers if configuration is loaded
+            if (staticConfig && markersWithNames) {
+                markersWithNames.forEach(marker => {
+                    const markerLine = lines.find(line => line.number === marker.line);
+                    if (!markerLine) return;
+
+                    // Calculate marker position along the path using progress
+                    const t = marker.startProgress;
+                    const worldPos = worldCurveAt(t);
+                    worldPos.x += markerLine.xOffset * t; // Apply line offset
+                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+
+                    // Calculate size based on position and configuration
+                    const config = marker.type === 'circle' ? staticConfig.config.circles : staticConfig.config.rectangles;
+                    const minSize = config.minSize || 2;
+                    const maxSize = config.maxSize || 16;
+                    const baseSize = minSize + (maxSize - minSize) * (1 - t);
+
+                    if (marker.type === 'circle') {
+                        // Create and position the circle
+                        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        circle.setAttribute('cx', pos.x);
+                        circle.setAttribute('cy', pos.y);
+                        circle.setAttribute('r', baseSize);
+                        circle.setAttribute('fill', marker.color);
+                        svg.appendChild(circle);
+                    } else if (marker.type === 'rectangle' && marker.name) {
+                        // Create and position the rectangle
+                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        const rectWidth = baseSize * config.defaultWidth;
+                        const rectHeight = baseSize * config.defaultHeight;
+                        rect.setAttribute('x', pos.x - rectWidth/2);
+                        rect.setAttribute('y', pos.y - rectHeight/2);
+                        rect.setAttribute('width', rectWidth);
+                        rect.setAttribute('height', rectHeight);
+                        rect.setAttribute('fill', marker.color);
+                        rect.setAttribute('rx', rectHeight * config.cornerRadius);
+                        svg.appendChild(rect);
+
+                        // Add name label inside rectangle
+                        const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        nameLabel.setAttribute('x', pos.x);
+                        nameLabel.setAttribute('y', pos.y + baseSize * 0.3);
+                        nameLabel.setAttribute('fill', '#000');
+                        nameLabel.setAttribute('font-size', `${baseSize * config.fontScale}px`);
+                        nameLabel.setAttribute('text-anchor', 'middle');
+                        nameLabel.setAttribute('dominant-baseline', 'middle');
+                        nameLabel.textContent = marker.name;
+                        svg.appendChild(nameLabel);
+                    }
+                });
+            }
             
             // Update dots last so they're on top
             updateDots();
@@ -586,7 +713,7 @@
         // Initialize
         let lastAngle = 0;
         let scrollProgress = 0;
-        updatePath();
+        loadConfiguration();  // Load config first, which will then call updatePath()
         updateDots();
 
         // Auto-scroll functionality
