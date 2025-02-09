@@ -460,25 +460,14 @@
             const nx = dy / len;
             const ny = -dx / len;
             
-            // Calculate angle of the curve
-            const angle = Math.atan2(dy, dx);
-            
-            // Smooth out sharp turns by reducing offset based on angle change
-            const prevT = Math.max(0, t - 0.1);
-            const prevPos = curveAt(prevT);
-            const prevDx = pCurrent.x - prevPos.x;
-            const prevDy = pCurrent.y - prevPos.y;
-            const prevAngle = Math.atan2(prevDy, prevDx);
-            
-            // Calculate angle difference and adjust offset
-            const angleDiff = Math.abs(angle - prevAngle);
-            const turnFactor = Math.max(0, 1 - (angleDiff / Math.PI) * 2);
-            const adjustedOffset = offset * (0.7 + 0.3 * turnFactor);
+            // Apply perspective scaling to the offset
+            const perspectiveScale = 1 / (1 + PERSPECTIVE_FACTOR * (1 - t));
+            const scaledOffset = offset / perspectiveScale;
             
             // Apply offset in normal direction from current point
             return {
-                x: pCurrent.x + nx * adjustedOffset,
-                y: pCurrent.y + ny * adjustedOffset
+                x: pCurrent.x + nx * scaledOffset,
+                y: pCurrent.y + ny * scaledOffset
             };
         }
 
@@ -487,7 +476,7 @@
             const steps = 100;
             let d = '';
             let dParallel = '';
-            const BASE_OFFSET = width * 0.05;
+            const BASE_OFFSET = width * 0.04; // Slightly reduced base offset
             
             // Store points for smoothing
             const mainPoints = [];
@@ -499,6 +488,7 @@
                 const pos = curveAt(t);
                 mainPoints.push(pos);
                 
+                // Calculate offset that grows from vanishing point
                 const offsetStrength = t;
                 const currentOffset = BASE_OFFSET * offsetStrength;
                 
