@@ -62,6 +62,11 @@
             <div class="value-display">0.2</div>
         </div>
         <div class="control-group">
+            <label>Number of Curves</label>
+            <input type="range" id="frequency" min="0.5" max="4" step="0.5" value="1">
+            <div class="value-display">1</div>
+        </div>
+        <div class="control-group">
             <label>Look-ahead Strength</label>
             <input type="range" id="lookAhead" min="0" max="0.5" step="0.01" value="0.3">
             <div class="value-display">0.3</div>
@@ -101,6 +106,7 @@
         // Controls setup
         const controls = {
             amplitude: document.getElementById('amplitude'),
+            frequency: document.getElementById('frequency'),
             lookAhead: document.getElementById('lookAhead'),
             secondary: document.getElementById('secondary'),
             tertiary: document.getElementById('tertiary'),
@@ -123,11 +129,7 @@
         const PATH_BASE_AMPLITUDE = width * 0.2;
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
-        const SCROLL_SENSITIVITY = 2.0;
-        const WAVE_FREQUENCY = Math.PI * 2;  // How many waves in one cycle
-        const SECONDARY_FREQUENCY = Math.PI;  // Half frequency for wider curves
-        const TERTIARY_FREQUENCY = Math.PI * 4;  // Double frequency for detail
-        const VIEWPORT_MARGIN = 50;  // Minimum distance from viewport edge
+        const VIEWPORT_MARGIN = 50;
 
         // Helper function to clamp a value between min and max
         function clamp(value, min, max) {
@@ -152,6 +154,12 @@
             const LOOK_AHEAD_STRENGTH = controls.lookAhead.value;
             const SECONDARY_STRENGTH = controls.secondary.value;
             const TERTIARY_STRENGTH = controls.tertiary.value;
+            
+            // Calculate frequencies based on the number of curves control
+            const baseFreq = Math.PI * 2 * controls.frequency.value;
+            const WAVE_FREQUENCY = baseFreq;
+            const SECONDARY_FREQUENCY = baseFreq * 0.5;  // Half frequency for wider curves
+            const TERTIARY_FREQUENCY = baseFreq * 2;  // Double frequency for detail
             
             // Calculate wave phases based on scroll position
             const mainPhase = scrollProgress * WAVE_FREQUENCY;
@@ -179,13 +187,11 @@
             let x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave + exitBias;
             
             // Apply viewport boundary clamping
-            // Strength increases as t approaches 1 (bottom of screen)
-            const clampStrength = Math.pow(t, 3);  // Cubic curve for smooth transition
+            const clampStrength = Math.pow(t, 3);
             const minX = VIEWPORT_MARGIN;
             const maxX = width - VIEWPORT_MARGIN;
             const clampedX = clamp(x, minX, maxX);
             
-            // Smoothly blend between unclamped and clamped positions
             x = lerp(x, clampedX, clampStrength);
             
             return { x, y: baseY };
