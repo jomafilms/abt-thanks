@@ -51,6 +51,8 @@
         const DOT_SPACING = 0.3;
         const SCROLL_SENSITIVITY = 2.0;
         const WAVE_FREQUENCY = Math.PI * 2;  // How many waves in one cycle
+        const SECONDARY_FREQUENCY = Math.PI;  // Half frequency for wider curves
+        const TERTIARY_FREQUENCY = Math.PI * 4;  // Double frequency for detail
 
         // Convert world coordinates to screen coordinates with perspective
         function applyPerspective(x, y, t) {
@@ -65,15 +67,22 @@
         function worldCurveAt(t) {
             const baseY = lerp(HORIZON_Y, height, t);
             
-            // Calculate wave phase based on scroll position
-            // This makes the waves appear to move towards the viewer
-            const phase = scrollProgress * WAVE_FREQUENCY;
+            // Calculate wave phases based on scroll position
+            const mainPhase = scrollProgress * WAVE_FREQUENCY;
+            const secondaryPhase = scrollProgress * SECONDARY_FREQUENCY * 0.7;  // Slower moving wide curves
+            const tertiaryPhase = scrollProgress * TERTIARY_FREQUENCY * 1.3;  // Faster moving detail
             
             // Amplitude increases as the wave gets closer (higher t)
-            const amplitude = PATH_BASE_AMPLITUDE * t;
+            const mainAmplitude = PATH_BASE_AMPLITUDE * t;
+            const secondaryAmplitude = PATH_BASE_AMPLITUDE * 0.5 * t;  // Wider, gentler curves
+            const tertiaryAmplitude = PATH_BASE_AMPLITUDE * 0.2 * t;  // Smaller detail curves
             
-            // The wave pattern shifts based on both t and scroll position
-            const x = VANISHING_POINT_X + Math.sin(t * WAVE_FREQUENCY + phase) * amplitude;
+            // Combine three wave patterns for more organic motion
+            const mainWave = Math.sin(t * WAVE_FREQUENCY + mainPhase) * mainAmplitude;
+            const secondaryWave = Math.sin(t * SECONDARY_FREQUENCY + secondaryPhase) * secondaryAmplitude;
+            const tertiaryWave = Math.sin(t * TERTIARY_FREQUENCY + tertiaryPhase) * tertiaryAmplitude;
+            
+            const x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave;
             
             return { x, y: baseY };
         }
