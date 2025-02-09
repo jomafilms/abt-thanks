@@ -131,8 +131,8 @@
             </div>
             <div class="control-group">
                 <label>Number of Curves</label>
-                <input type="range" id="frequency" min="0.5" max="4" step="0.5" value="1">
-                <div class="value-display">1</div>
+                <input type="range" id="frequency" min="0.5" max="4" step="0.5" value="1.5">
+                <div class="value-display">1.5</div>
             </div>
             <div class="control-group">
                 <label>Look-ahead Strength</label>
@@ -207,15 +207,95 @@
             sensitivity: document.getElementById('sensitivity')
         };
 
-        // Update value displays
+        // Calculate safe maximums based on viewport and other controls
+        function updateControlLimits() {
+            // Base maximum amplitude as percentage of viewport width
+            const baseMaxAmplitude = Math.min(0.3, width / 2500);  // More conservative base
+            
+            // Calculate combined effect of all wave controls
+            const totalWaveStrength = parseFloat(controls.secondary.value) + parseFloat(controls.tertiary.value);
+            const combinedWaveFactor = 1 / Math.max(1, totalWaveStrength * 2);
+            
+            // Adjust amplitude max based on all factors
+            const freqFactor = 1 / Math.max(1, controls.frequency.value * 1.5);
+            const lookAheadFactor = 1 / Math.max(1, controls.lookAhead.value * 3);
+            const safeAmplitude = baseMaxAmplitude * freqFactor * lookAheadFactor * combinedWaveFactor;
+            
+            // Update amplitude control
+            controls.amplitude.max = safeAmplitude.toFixed(2);
+            if (parseFloat(controls.amplitude.value) > safeAmplitude) {
+                controls.amplitude.value = safeAmplitude;
+                controls.amplitude.nextElementSibling.textContent = safeAmplitude.toFixed(2);
+            }
+            
+            // Adjust frequency max based on viewport and other factors
+            const baseMaxFreq = Math.min(3, width / 600);  // More conservative base
+            const amplitudeFactor = 1 / Math.max(1, controls.amplitude.value * 4);
+            const wavesFactor = 1 / Math.max(1, totalWaveStrength * 1.5);
+            const safeFreq = baseMaxFreq * amplitudeFactor * wavesFactor;
+            
+            // Update frequency control
+            controls.frequency.max = safeFreq.toFixed(1);
+            if (parseFloat(controls.frequency.value) > safeFreq) {
+                controls.frequency.value = safeFreq;
+                controls.frequency.nextElementSibling.textContent = safeFreq.toFixed(1);
+            }
+            
+            // Adjust look-ahead based on all factors
+            const baseMaxLookAhead = Math.min(0.4, width / 2500);  // More conservative base
+            const combinedFactor = 1 / Math.max(1, (controls.amplitude.value * controls.frequency.value * 2) + totalWaveStrength);
+            const safeLookAhead = baseMaxLookAhead * combinedFactor;
+            
+            // Update look-ahead control
+            controls.lookAhead.max = safeLookAhead.toFixed(2);
+            if (parseFloat(controls.lookAhead.value) > safeLookAhead) {
+                controls.lookAhead.value = safeLookAhead;
+                controls.lookAhead.nextElementSibling.textContent = safeLookAhead.toFixed(2);
+            }
+            
+            // Secondary and tertiary waves scale with all factors
+            const baseMaxSecondary = Math.min(0.8, width / 2000);  // More conservative base
+            const baseMaxTertiary = Math.min(0.6, width / 2000);   // Even more conservative for detail wave
+            
+            const mainFactor = 1 / Math.max(1, controls.amplitude.value * 3);
+            const freqWaveFactor = 1 / Math.max(1, controls.frequency.value * 2);
+            
+            // Calculate safe values considering interdependencies
+            const safeSecondary = baseMaxSecondary * mainFactor * freqWaveFactor;
+            const safeTertiary = baseMaxTertiary * mainFactor * freqWaveFactor;
+            
+            // Update secondary and tertiary controls
+            controls.secondary.max = safeSecondary.toFixed(2);
+            controls.tertiary.max = safeTertiary.toFixed(2);
+            
+            if (parseFloat(controls.secondary.value) > safeSecondary) {
+                controls.secondary.value = safeSecondary;
+                controls.secondary.nextElementSibling.textContent = safeSecondary.toFixed(2);
+            }
+            if (parseFloat(controls.tertiary.value) > safeTertiary) {
+                controls.tertiary.value = safeTertiary;
+                controls.tertiary.nextElementSibling.textContent = safeTertiary.toFixed(2);
+            }
+        }
+
+        // Update value displays and limits
         Object.entries(controls).forEach(([key, control]) => {
             const display = control.nextElementSibling;
             control.addEventListener('input', () => {
                 display.textContent = control.value;
+                updateControlLimits(); // Update limits when any control changes
                 updatePath();
                 updateDots();
             });
         });
+
+        // Update limits on window resize
+        window.addEventListener('resize', () => {
+            updateControlLimits();
+        });
+
+        // Initial limits setup
+        updateControlLimits();
         
         // Constants for perspective and path
         const HORIZON_Y = height * 0.2;
@@ -280,13 +360,26 @@
             // Calculate raw x position
             let x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave + exitBias;
             
-            // Apply viewport boundary clamping
-            const clampStrength = Math.pow(t, 3);
+            // Apply viewport boundary clamping with smoother transition
             const minX = VIEWPORT_MARGIN;
             const maxX = width - VIEWPORT_MARGIN;
-            const clampedX = clamp(x, minX, maxX);
             
-            x = lerp(x, clampedX, clampStrength);
+            // Use smooth step function for clamping transition
+            const smoothStep = (x) => x * x * (3 - 2 * x);
+            const clampStrength = smoothStep(Math.pow(t, 2));
+            
+            // Calculate how far outside bounds we are
+            const overMin = Math.max(0, minX - x);
+            const overMax = Math.max(0, x - maxX);
+            
+            // Apply smooth clamping if outside bounds
+            if (overMin > 0) {
+                const smoothTransition = smoothStep(Math.min(1, overMin / (PATH_BASE_AMPLITUDE * 0.5)));
+                x = lerp(x, minX, smoothTransition * clampStrength);
+            } else if (overMax > 0) {
+                const smoothTransition = smoothStep(Math.min(1, overMax / (PATH_BASE_AMPLITUDE * 0.5)));
+                x = lerp(x, maxX, smoothTransition * clampStrength);
+            }
             
             return { x, y: baseY };
         }
