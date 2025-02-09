@@ -35,6 +35,31 @@
             color: #D4A373;
             font-family: sans-serif;
             min-width: 200px;
+            transition: opacity 0.3s ease-out;
+        }
+        .controls.collapsed {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .controls.collapsed .controls-content {
+            opacity: 0;
+        }
+        .gear-icon {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            color: #D4A373;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px;
+            border-radius: 50%;
+            z-index: 1000;
+        }
+        .controls-content {
+            margin-top: 15px;
+            transition: opacity 0.2s ease-out;
         }
         .control-group {
             margin-bottom: 15px;
@@ -52,39 +77,80 @@
             font-size: 10px;
             color: rgba(212, 163, 115, 0.7);
         }
+        .auto-scroll {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(212, 163, 115, 0.3);
+        }
+        .play-button {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            color: #D4A373;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .play-button:hover {
+            color: #e4b383;
+        }
+        .auto-scroll-label {
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
+    <svg class="gear-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+    </svg>
+
     <div class="controls">
-        <div class="control-group">
-            <label>Wave Amplitude</label>
-            <input type="range" id="amplitude" min="0" max="0.4" step="0.01" value="0.2">
-            <div class="value-display">0.2</div>
-        </div>
-        <div class="control-group">
-            <label>Number of Curves</label>
-            <input type="range" id="frequency" min="0.5" max="4" step="0.5" value="1">
-            <div class="value-display">1</div>
-        </div>
-        <div class="control-group">
-            <label>Look-ahead Strength</label>
-            <input type="range" id="lookAhead" min="0" max="0.5" step="0.01" value="0.3">
-            <div class="value-display">0.3</div>
-        </div>
-        <div class="control-group">
-            <label>Secondary Wave Strength</label>
-            <input type="range" id="secondary" min="0" max="1" step="0.01" value="0.5">
-            <div class="value-display">0.5</div>
-        </div>
-        <div class="control-group">
-            <label>Detail Wave Strength</label>
-            <input type="range" id="tertiary" min="0" max="1" step="0.01" value="0.2">
-            <div class="value-display">0.2</div>
-        </div>
-        <div class="control-group">
-            <label>Scroll Sensitivity</label>
-            <input type="range" id="sensitivity" min="0.5" max="4" step="0.1" value="2.0">
-            <div class="value-display">2.0</div>
+        <div class="controls-content">
+            <div class="control-group">
+                <label>Wave Amplitude</label>
+                <input type="range" id="amplitude" min="0" max="0.4" step="0.01" value="0.2">
+                <div class="value-display">0.2</div>
+            </div>
+            <div class="control-group">
+                <label>Number of Curves</label>
+                <input type="range" id="frequency" min="0.5" max="4" step="0.5" value="1">
+                <div class="value-display">1</div>
+            </div>
+            <div class="control-group">
+                <label>Look-ahead Strength</label>
+                <input type="range" id="lookAhead" min="0" max="0.5" step="0.01" value="0.3">
+                <div class="value-display">0.3</div>
+            </div>
+            <div class="control-group">
+                <label>Secondary Wave Strength</label>
+                <input type="range" id="secondary" min="0" max="1" step="0.01" value="0.5">
+                <div class="value-display">0.5</div>
+            </div>
+            <div class="control-group">
+                <label>Detail Wave Strength</label>
+                <input type="range" id="tertiary" min="0" max="1" step="0.01" value="0.2">
+                <div class="value-display">0.2</div>
+            </div>
+            <div class="control-group">
+                <label>Scroll Sensitivity</label>
+                <input type="range" id="sensitivity" min="0.5" max="4" step="0.1" value="2.0">
+                <div class="value-display">2.0</div>
+            </div>
+            <div class="auto-scroll">
+                <button class="play-button" title="Toggle auto-scroll">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path class="play-icon" d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
+                        <path class="pause-icon" d="M14,19H18V5H14M6,19H10V5H6V19Z" style="display: none;"/>
+                    </svg>
+                </button>
+                <span class="auto-scroll-label">Auto-scroll</span>
+            </div>
         </div>
     </div>
 
@@ -272,6 +338,51 @@
         function lerp(start, end, t) {
             return start * (1 - t) + end * t;
         }
+
+        // Auto-scroll functionality
+        let isAutoScrolling = false;
+        let autoScrollAnimation;
+
+        function updateAutoScroll() {
+            if (isAutoScrolling) {
+                const scrollStep = () => {
+                    scrollProgress += 0.001 * controls.sensitivity.value;
+                    updateDots();
+                    updatePath();
+                    autoScrollAnimation = requestAnimationFrame(scrollStep);
+                };
+                autoScrollAnimation = requestAnimationFrame(scrollStep);
+            } else {
+                cancelAnimationFrame(autoScrollAnimation);
+            }
+        }
+
+        // Toggle auto-scroll
+        const playButton = document.querySelector('.play-button');
+        const playIcon = playButton.querySelector('.play-icon');
+        const pauseIcon = playButton.querySelector('.pause-icon');
+
+        playButton.addEventListener('click', () => {
+            isAutoScrolling = !isAutoScrolling;
+            playIcon.style.display = isAutoScrolling ? 'none' : 'block';
+            pauseIcon.style.display = isAutoScrolling ? 'block' : 'none';
+            updateAutoScroll();
+        });
+
+        // Stop auto-scroll when user manually scrolls
+        window.addEventListener('wheel', () => {
+            if (isAutoScrolling) {
+                isAutoScrolling = false;
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+                updateAutoScroll();
+            }
+        }, { passive: false });
+
+        // Add gear icon click handler
+        document.querySelector('.gear-icon').addEventListener('click', () => {
+            document.querySelector('.controls').classList.toggle('collapsed');
+        });
     </script>
 </body>
 </html> 
