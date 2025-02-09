@@ -25,9 +25,64 @@
             fill: #D4A373;
             transition: opacity 0.2s ease-out;
         }
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: #D4A373;
+            font-family: sans-serif;
+            min-width: 200px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .control-group input {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        .value-display {
+            font-size: 10px;
+            color: rgba(212, 163, 115, 0.7);
+        }
     </style>
 </head>
 <body>
+    <div class="controls">
+        <div class="control-group">
+            <label>Wave Amplitude</label>
+            <input type="range" id="amplitude" min="0" max="0.4" step="0.01" value="0.2">
+            <div class="value-display">0.2</div>
+        </div>
+        <div class="control-group">
+            <label>Look-ahead Strength</label>
+            <input type="range" id="lookAhead" min="0" max="0.5" step="0.01" value="0.3">
+            <div class="value-display">0.3</div>
+        </div>
+        <div class="control-group">
+            <label>Secondary Wave Strength</label>
+            <input type="range" id="secondary" min="0" max="1" step="0.01" value="0.5">
+            <div class="value-display">0.5</div>
+        </div>
+        <div class="control-group">
+            <label>Detail Wave Strength</label>
+            <input type="range" id="tertiary" min="0" max="1" step="0.01" value="0.2">
+            <div class="value-display">0.2</div>
+        </div>
+        <div class="control-group">
+            <label>Scroll Sensitivity</label>
+            <input type="range" id="sensitivity" min="0.5" max="4" step="0.1" value="2.0">
+            <div class="value-display">2.0</div>
+        </div>
+    </div>
+
     <svg id="scene">
         <!-- We'll draw a single curved line from bottom to top -->
     </svg>
@@ -42,6 +97,25 @@
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute('class', 'path');
         svg.appendChild(path);
+        
+        // Controls setup
+        const controls = {
+            amplitude: document.getElementById('amplitude'),
+            lookAhead: document.getElementById('lookAhead'),
+            secondary: document.getElementById('secondary'),
+            tertiary: document.getElementById('tertiary'),
+            sensitivity: document.getElementById('sensitivity')
+        };
+
+        // Update value displays
+        Object.entries(controls).forEach(([key, control]) => {
+            const display = control.nextElementSibling;
+            control.addEventListener('input', () => {
+                display.textContent = control.value;
+                updatePath();
+                updateDots();
+            });
+        });
         
         // Constants for perspective and path
         const HORIZON_Y = height * 0.2;
@@ -67,22 +141,35 @@
         function worldCurveAt(t) {
             const baseY = lerp(HORIZON_Y, height, t);
             
+            // Get current control values
+            const PATH_BASE_AMPLITUDE = width * controls.amplitude.value;
+            const LOOK_AHEAD_STRENGTH = controls.lookAhead.value;
+            const SECONDARY_STRENGTH = controls.secondary.value;
+            const TERTIARY_STRENGTH = controls.tertiary.value;
+            
             // Calculate wave phases based on scroll position
             const mainPhase = scrollProgress * WAVE_FREQUENCY;
-            const secondaryPhase = scrollProgress * SECONDARY_FREQUENCY * 0.7;  // Slower moving wide curves
-            const tertiaryPhase = scrollProgress * TERTIARY_FREQUENCY * 1.3;  // Faster moving detail
+            const secondaryPhase = scrollProgress * SECONDARY_FREQUENCY * 0.7;
+            const tertiaryPhase = scrollProgress * TERTIARY_FREQUENCY * 1.3;
+            
+            // Look ahead to see where the next curve is going
+            const lookAheadPhase = mainPhase + WAVE_FREQUENCY * 0.25;
+            const nextDirection = Math.cos(lookAheadPhase);
             
             // Amplitude increases as the wave gets closer (higher t)
             const mainAmplitude = PATH_BASE_AMPLITUDE * t;
-            const secondaryAmplitude = PATH_BASE_AMPLITUDE * 0.5 * t;  // Wider, gentler curves
-            const tertiaryAmplitude = PATH_BASE_AMPLITUDE * 0.2 * t;  // Smaller detail curves
+            const secondaryAmplitude = PATH_BASE_AMPLITUDE * SECONDARY_STRENGTH * t;
+            const tertiaryAmplitude = PATH_BASE_AMPLITUDE * TERTIARY_STRENGTH * t;
             
-            // Combine three wave patterns for more organic motion
+            // Add a slight bias to the exit point based on the next curve's direction
+            const exitBias = -nextDirection * PATH_BASE_AMPLITUDE * LOOK_AHEAD_STRENGTH * Math.pow(t, 2);
+            
+            // Combine wave patterns for organic motion
             const mainWave = Math.sin(t * WAVE_FREQUENCY + mainPhase) * mainAmplitude;
             const secondaryWave = Math.sin(t * SECONDARY_FREQUENCY + secondaryPhase) * secondaryAmplitude;
             const tertiaryWave = Math.sin(t * TERTIARY_FREQUENCY + tertiaryPhase) * tertiaryAmplitude;
             
-            const x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave;
+            const x = VANISHING_POINT_X + mainWave + secondaryWave + tertiaryWave + exitBias;
             
             return { x, y: baseY };
         }
@@ -151,12 +238,11 @@
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
             
-            const delta = e.deltaY * SCROLL_SENSITIVITY * 0.001;
-            scrollProgress += delta;  // Let scrollProgress grow continuously
+            const delta = e.deltaY * controls.sensitivity.value * 0.001;
+            scrollProgress += delta;
             
-            // Only use modulo for dot positioning, not for the wave phase
             updateDots();
-            updatePath();  // Need to update path each frame for the wave motion
+            updatePath();
         }, { passive: false });
 
         // Helper function for linear interpolation
