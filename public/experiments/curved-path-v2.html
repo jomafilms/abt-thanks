@@ -200,9 +200,9 @@
         
         // Set horizon line coordinates
         horizonLine.setAttribute('x1', '0');
-        horizonLine.setAttribute('y1', height * 0.2);
+        horizonLine.setAttribute('y1', height * 0.4);
         horizonLine.setAttribute('x2', width);
-        horizonLine.setAttribute('y2', height * 0.2);
+        horizonLine.setAttribute('y2', height * 0.4);
         
         svg.appendChild(horizonLine);
         svg.appendChild(pathParallel);
@@ -324,27 +324,71 @@
         updateControlLimits();
         
         // Constants for perspective and path
-        const HORIZON_Y = height * 0.2;
+        const HORIZON_Y = height * 0.4;
         const VANISHING_POINT_X = width * 0.5;
         const PATH_BASE_AMPLITUDE = width * 0.2;
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
         const VIEWPORT_MARGIN = 50;
-        const NUM_GRID_LINES = 20; // Number of vertical grid lines on each side
-        const NUM_LATITUDE_LINES = 10; // Number of horizontal grid lines
+        const NUM_GRID_LINES = 20;
+        const NUM_LATITUDE_LINES = 10;
+        let bounceOffset = 0;
 
-        // Helper function to clamp a value between min and max
-        function clamp(value, min, max) {
-            return Math.min(Math.max(value, min), max);
+        // Helper function for linear interpolation
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
         }
 
-        // Convert world coordinates to screen coordinates with perspective
+        // Helper function to update horizon line position
+        function updateHorizonLine() {
+            horizonLine.setAttribute('y1', HORIZON_Y + bounceOffset);
+            horizonLine.setAttribute('y2', HORIZON_Y + bounceOffset);
+        }
+
+        // Update scroll handler to include bounce
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            const delta = e.deltaY * controls.sensitivity.value * 0.001;
+            scrollProgress += delta;
+            
+            // Update bounce offset based on scroll progress
+            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
+            
+            updateHorizonLine();
+            updatePath();
+            updateDots();
+        }, { passive: false });
+
+        // Update auto-scroll to include bounce
+        function updateAutoScroll() {
+            if (isAutoScrolling) {
+                const scrollStep = () => {
+                    scrollProgress += 0.001 * controls.sensitivity.value;
+                    bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
+                    updateHorizonLine();
+                    updateDots();
+                    updatePath();
+                    autoScrollAnimation = requestAnimationFrame(scrollStep);
+                };
+                autoScrollAnimation = requestAnimationFrame(scrollStep);
+            } else {
+                cancelAnimationFrame(autoScrollAnimation);
+            }
+        }
+
+        // Modify applyPerspective to use bouncing vanishing point
         function applyPerspective(x, y, t) {
             const scale = 1 / (1 + PERSPECTIVE_FACTOR * t);
             return {
                 x: VANISHING_POINT_X + (x - VANISHING_POINT_X) * scale,
-                y: HORIZON_Y + (y - HORIZON_Y) * scale
+                y: (HORIZON_Y + bounceOffset) + (y - (HORIZON_Y + bounceOffset)) * scale
             };
+        }
+
+        // Helper function to clamp a value between min and max
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
         }
 
         // Define the curve shape in world coordinates
@@ -592,39 +636,9 @@
         updatePath();
         updateDots();
 
-        // Scroll handler
-        window.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            
-            const delta = e.deltaY * controls.sensitivity.value * 0.001;
-            scrollProgress += delta;
-            
-            updateDots();
-            updatePath();
-        }, { passive: false });
-
-        // Helper function for linear interpolation
-        function lerp(start, end, t) {
-            return start * (1 - t) + end * t;
-        }
-
         // Auto-scroll functionality
         let isAutoScrolling = false;
         let autoScrollAnimation;
-
-        function updateAutoScroll() {
-            if (isAutoScrolling) {
-                const scrollStep = () => {
-                    scrollProgress += 0.001 * controls.sensitivity.value;
-                    updateDots();
-                    updatePath();
-                    autoScrollAnimation = requestAnimationFrame(scrollStep);
-                };
-                autoScrollAnimation = requestAnimationFrame(scrollStep);
-            } else {
-                cancelAnimationFrame(autoScrollAnimation);
-            }
-        }
 
         // Toggle auto-scroll
         const playButton = document.querySelector('.play-button');
