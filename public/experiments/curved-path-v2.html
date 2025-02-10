@@ -271,14 +271,41 @@
                     isInMainPath
                 });
                 
-                // Add line number labels at bottom with new color
+                // Add line number labels at bottom, tied to paths
                 if (showGrid && i % 5 === 0) {
+                    const fixedY = height * 0.85; // Our target y-position
+                    
+                    // Find where the path intersects with our fixed y-position
+                    let bestT = 0;
+                    let closestDist = Infinity;
+                    const steps = 50;
+                    
+                    // Search for the closest point to our fixed y
+                    for (let j = 0; j <= steps; j++) {
+                        const searchT = j / steps;
+                        const worldPos = worldCurveAt(searchT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                        worldPos.x += xOffset * searchT;
+                        const pos = applyPerspective(worldPos.x, worldPos.y, 1 - searchT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
+                        
+                        const dist = Math.abs(pos.y - fixedY);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            bestT = searchT;
+                        }
+                    }
+                    
+                    // Get the x-position at the intersection point
+                    const worldPos = worldCurveAt(bestT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                    worldPos.x += xOffset * bestT;
+                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - bestT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
+                    
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute('x', VANISHING_POINT_X + xOffset);
-                    text.setAttribute('y', height - 10);
+                    text.setAttribute('x', pos.x);
+                    text.setAttribute('y', fixedY);
                     text.setAttribute('class', 'debug-text');
                     text.setAttribute('fill', '#D4A373');
                     text.setAttribute('opacity', '0.4');
+                    text.setAttribute('text-anchor', 'middle');
                     text.textContent = i.toString();
                     svg.appendChild(text);
                 }
