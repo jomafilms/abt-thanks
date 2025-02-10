@@ -96,8 +96,8 @@
         import StaticObjectManager from './js/staticObjects.js';
 
         // Get viewport dimensions
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        let width = window.innerWidth;
+        let height = window.innerHeight;
         
         // Create the paths
         const svg = document.getElementById('scene');
@@ -107,27 +107,22 @@
         path.setAttribute('class', 'path');
         horizonLine.setAttribute('class', 'horizon-line');
         
-        // Set horizon line coordinates
-        horizonLine.setAttribute('x1', '0');
-        horizonLine.setAttribute('y1', height * 0.4);
-        horizonLine.setAttribute('x2', width);
-        horizonLine.setAttribute('y2', height * 0.4);
-        
+        // Append initial SVG elements
         svg.appendChild(horizonLine);
         svg.appendChild(path);
         
-        // Constants for perspective and path
-        const HORIZON_Y = height * 0.4;
-        const VANISHING_POINT_X = width * 0.5;
-        const PATH_BASE_AMPLITUDE = width * 0.2;
+        // Constants for perspective and path - these will be updated on resize
+        let HORIZON_Y = height * 0.4;
+        let VANISHING_POINT_X = width * 0.5;
+        let PATH_BASE_AMPLITUDE = width * 0.2;
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
-        const VIEWPORT_MARGIN = 50;
-        const BASE_LINE_SPACING = width * 0.05;  // 5% of viewport width
-        const horizonRatio = HORIZON_Y / height;
-        const viewportOverflow = 2 + (1 - horizonRatio) * 2;
-        const totalWidth = width * viewportOverflow;
-        const NUM_GRID_LINES = Math.ceil(totalWidth / BASE_LINE_SPACING);  // Match original calculation
+        let VIEWPORT_MARGIN = 50;
+        let BASE_LINE_SPACING = width * 0.05;  // 5% of viewport width
+        let horizonRatio = HORIZON_Y / height;
+        let viewportOverflow = 2 + (1 - horizonRatio) * 2;
+        let totalWidth = width * viewportOverflow;
+        let NUM_GRID_LINES = Math.ceil(totalWidth / BASE_LINE_SPACING);
         const NUM_LATITUDE_LINES = 10;
         let bounceOffset = 0;
         let hasStarted = false;  // Track if animation has started
@@ -505,11 +500,80 @@
             controls.stopAutoScroll();
         }, { passive: false });
 
+        // Function to get safe viewport height
+        function getSafeHeight() {
+            // If Visual Viewport API is available, prefer it
+            if (window.visualViewport) {
+                return window.visualViewport.height;
+            }
+            // Fallback to innerHeight
+            return window.innerHeight;
+        }
+
+        // Function to update viewport-dependent values
+        function updateViewportValues() {
+            width = window.innerWidth;
+            height = getSafeHeight();
+            
+            HORIZON_Y = height * 0.4;
+            VANISHING_POINT_X = width * 0.5;
+            PATH_BASE_AMPLITUDE = width * 0.2;
+            VIEWPORT_MARGIN = 50;
+            BASE_LINE_SPACING = width * 0.05;
+            horizonRatio = HORIZON_Y / height;
+            viewportOverflow = 2 + (1 - horizonRatio) * 2;
+            totalWidth = width * viewportOverflow;
+            NUM_GRID_LINES = Math.ceil(totalWidth / BASE_LINE_SPACING);
+            
+            // Update horizon line coordinates
+            horizonLine.setAttribute('x1', '0');
+            horizonLine.setAttribute('y1', HORIZON_Y);
+            horizonLine.setAttribute('x2', width);
+            horizonLine.setAttribute('y2', HORIZON_Y);
+
+            // Update CSS variable for horizon position
+            document.documentElement.style.setProperty('--horizon-y', `${horizonRatio * 100}%`);
+            
+            // Rebuild arc-length table and update path
+            buildArcLengthTable();
+            updatePath();
+        }
+
+        // Handle resize with Visual Viewport API if available
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                updateViewportValues();
+            });
+        } else {
+            // Fallback to window resize with delay for Safari
+            window.addEventListener('resize', () => {
+                requestAnimationFrame(() => {
+                    setTimeout(updateViewportValues, 100);
+                });
+            });
+        }
+
+        // Handle page show events (especially important for iOS)
+        window.addEventListener('pageshow', () => {
+            requestAnimationFrame(() => {
+                setTimeout(updateViewportValues, 100);
+            });
+        });
+
+        // Also update on visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                requestAnimationFrame(() => {
+                    setTimeout(updateViewportValues, 100);
+                });
+            }
+        });
+
         // Initialize
         async function init() {
             await markerManager.loadConfiguration();
             await staticObjectManager.loadConfiguration();
-            updatePath();
+            updateViewportValues(); // Use this instead of just updatePath()
         }
 
         init();

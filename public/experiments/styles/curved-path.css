@@ -1,6 +1,8 @@
-body {
+html, body {
     margin: 0;
-    min-height: 100vh;
+    padding: 0;
+    height: 100%;
+    min-height: 100%;
     overflow: hidden;
 }
 
@@ -9,8 +11,8 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 40vh; /* Match the horizon line at 40% */
+    width: 100%;
+    height: var(--horizon-y, 40%); /* Use CSS variable with fallback */
     z-index: -2;
     pointer-events: none;
     background: #B8E1FF;  /* Light blue sky color from reference */
@@ -19,28 +21,26 @@ body {
 /* Mountains */
 .mountains-container {
     position: fixed;
-    top: 20vh;
+    top: 0;
     left: 0;
-    width: 100vw;
-    height: 35vh;
+    width: 100%;
+    height: var(--horizon-y, 40%);
     z-index: -1;
     pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    /* Clip everything below 40vh (horizon line) */
-    clip-path: polygon(0 0, 100% 0, 100% 20vh, 0 20vh);
 }
 
 .mountains {
-    width: 100vw;
-    height: auto;
-    min-width: 100vw;
+    width: 100%;
+    height: 100%;
+    min-width: 100%;
     object-fit: cover;
-    object-position: center 30%; /* Adjust vertical position */
+    object-position: center 30%;
     opacity: 0.8;
-    transform: scale(1.5); /* Increased scale to ensure coverage */
+    transform: scale(1.5);
 }
 
 .cloud {
@@ -120,8 +120,12 @@ body {
 }
 
 svg {
-    width: 100vw;
-    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible; /* Allow paths to extend beyond SVG bounds */
 }
 .path {
     fill: none;
@@ -267,10 +271,10 @@ svg {
 /* Ground effects */
 .ground {
     position: fixed;
-    top: 40vh;
+    top: var(--horizon-y, 40%);
     left: 0;
-    width: 100vw;
-    height: 60vh;
+    width: 100%;
+    height: calc(100% - var(--horizon-y, 40%));
     z-index: -3;
     pointer-events: none;
     background: linear-gradient(
@@ -284,10 +288,10 @@ svg {
 
 .ground-fog {
     position: fixed;
-    top: 40vh;
+    top: var(--horizon-y, 40%);
     left: 0;
-    width: 100vw;
-    height: 30vh;
+    width: 100%;
+    height: calc((100% - var(--horizon-y, 40%)) * 0.5);
     z-index: -2;
     pointer-events: none;
     background: linear-gradient(
@@ -300,10 +304,10 @@ svg {
 
 .ground-texture {
     position: fixed;
-    top: 40vh;
+    top: var(--horizon-y, 40%);
     left: 0;
-    width: 100vw;
-    height: 60vh;
+    width: 100%;
+    height: calc(100% - var(--horizon-y, 40%));
     z-index: -1;
     pointer-events: none;
     opacity: 0.07;
