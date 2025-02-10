@@ -14,6 +14,17 @@ export default class MarkerManager {
             const namesResponse = await fetch('names.json');
             const namesData = await namesResponse.json();
 
+            // Add our test yellow dot
+            this.staticConfig.markers.push({
+                id: "test-yellow-dot",
+                line: -10,
+                startProgress: 0.4, // 40% from horizon
+                color: "rgba(255, 255, 0, 0.3)", // Yellow with 30% opacity
+                type: "circle",
+                description: "Test yellow dot",
+                canReceiveName: false
+            });
+
             // Assign names to available markers
             this.markersWithNames = this.staticConfig.markers.map(marker => {
                 if (marker.canReceiveName && namesData.names.length > 0) {
@@ -33,15 +44,32 @@ export default class MarkerManager {
     renderMarkers(svg, lines, calculateMarkerProgress, worldCurveAt, applyPerspective, hasStarted, scrollProgress) {
         if (!this.staticConfig || !this.markersWithNames) return;
 
-        this.markersWithNames.forEach(marker => {
-            const markerLine = lines.find(line => line.number === marker.line);
-            if (!markerLine) return;
+        // Highlight line -10
+        const line10 = lines.find(line => line.number === -10);
+        if (line10) {
+            // Create a copy of line -10's path with a highlight color
+            const highlightPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            highlightPath.setAttribute('d', line10.d);
+            highlightPath.setAttribute('class', 'path-grid');
+            highlightPath.setAttribute('stroke', 'rgba(255, 255, 0, 0.5)');
+            highlightPath.setAttribute('stroke-width', '3');
+            svg.appendChild(highlightPath);
+        }
 
-            // Calculate marker position along the path using progress
-            const t = calculateMarkerProgress(marker, hasStarted, scrollProgress);
-            const worldPos = worldCurveAt(t);
-            worldPos.x += markerLine.xOffset * t; // Apply line offset
-            const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+        this.markersWithNames.forEach(marker => {
+            // Find the corresponding line for this marker
+            const markerLine = lines.find(line => line.number === marker.line);
+            if (!markerLine || !markerLine.pathEl) return;
+
+            // Calculate progress and get position on the path
+            const t = calculateMarkerProgress(marker);
+            if (t < 0 || t > 1) return;
+
+            // Get the total length of the path
+            const totalLength = markerLine.pathEl.getTotalLength();
+            // Get the point at the current progress
+            const point = markerLine.pathEl.getPointAtLength(totalLength * t);
+            const pos = { x: point.x, y: point.y };
 
             // Calculate size based on position and configuration
             const config = marker.type === 'circle' ? this.staticConfig.config.circles : this.staticConfig.config.rectangles;
@@ -49,13 +77,11 @@ export default class MarkerManager {
             const maxSize = config.maxSize || 16;
             const baseSize = minSize + (maxSize - minSize) * t;
 
-            // Only render if the marker is within view range (0 to 1)
-            if (t >= 0 && t <= 1) {
-                if (marker.type === 'circle') {
-                    this.renderCircle(svg, pos, baseSize, marker.color);
-                } else if (marker.type === 'rectangle' && marker.name) {
-                    this.renderRectangle(svg, pos, baseSize, marker, config);
-                }
+            // Render the marker
+            if (marker.type === 'circle') {
+                this.renderCircle(svg, pos, baseSize, marker.color);
+            } else if (marker.type === 'rectangle' && marker.name) {
+                this.renderRectangle(svg, pos, baseSize, marker, config);
             }
         });
     }

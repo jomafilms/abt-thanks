@@ -214,11 +214,12 @@
                 gridPath.style.opacity = isInMainPath ? 0.4 : 0.2;
                 svg.appendChild(gridPath);
                 
-                // Store line info
+                // Store line info with path element reference
                 lines.push({
                     number: i,
                     xOffset,
                     d: gridD,
+                    pathEl: gridPath,  // Store reference to the actual path element
                     isInMainPath
                 });
                 
