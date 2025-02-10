@@ -223,8 +223,8 @@
                     latLine.setAttribute('stroke-dasharray', '4 4');
                     svg.appendChild(latLine);
                     
-                    // Add percentage label
-                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(mt * 100).toFixed(0)}%`);
+                    // Add percentage label with new coordinate system
+                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(t * 100).toFixed(0)}%`);
                 }
             }
             
@@ -271,9 +271,16 @@
                     isInMainPath
                 });
                 
-                // Add line number at bottom if grid is visible
+                // Add line number labels at bottom with new color
                 if (showGrid && i % 5 === 0) {
-                    addDebugText(svg, VANISHING_POINT_X + xOffset, height - 10, i.toString());
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute('x', VANISHING_POINT_X + xOffset);
+                    text.setAttribute('y', height - 10);
+                    text.setAttribute('class', 'debug-text');
+                    text.setAttribute('fill', '#D4A373');
+                    text.setAttribute('opacity', '0.4');
+                    text.textContent = i.toString();
+                    svg.appendChild(text);
                 }
             }
             

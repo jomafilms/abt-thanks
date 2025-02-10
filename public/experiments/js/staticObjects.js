@@ -43,11 +43,9 @@ export default class StaticObjectManager {
                 const BASE_MAX_SIZE = 100; // Base max size for scale factor 1
                 const maxSize = BASE_MAX_SIZE * scaleFactor;
 
-                // Adjust growth curve to reach full size around 20% from bottom
-                // t = 0 is horizon, t = 1 is bottom
-                // We want full size at t = 0.8
-                const growthT = Math.min(t / 0.8, 1); // Reach full size at 80% of the path
-                const currentSize = MIN_SIZE + (maxSize - MIN_SIZE) * growthT;
+                // Reach full size at t = 0.8 (20% from bottom)
+                const growthProgress = Math.min(t / 0.8, 1);
+                const currentSize = MIN_SIZE + (maxSize - MIN_SIZE) * growthProgress;
 
                 // Create and render the object based on its type
                 if (template.type === 'svg' && template.render === 'tree') {
