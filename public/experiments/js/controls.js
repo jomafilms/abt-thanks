@@ -167,15 +167,14 @@ export class Controls {
     }
 
     stopAutoScroll() {
-        if (this.isAutoScrolling) {
-            this.isAutoScrolling = false;
+        if (this.autoScrollInterval) {
+            clearInterval(this.autoScrollInterval);
+            this.autoScrollInterval = null;
             const playIcon = document.querySelector('.play-icon');
             const pauseIcon = document.querySelector('.pause-icon');
-            playIcon.style.display = 'block';
-            pauseIcon.style.display = 'none';
-            if (this.autoScrollAnimation) {
-                cancelAnimationFrame(this.autoScrollAnimation);
-                this.autoScrollAnimation = null;
+            if (playIcon && pauseIcon) {
+                playIcon.style.display = '';
+                pauseIcon.style.display = 'none';
             }
         }
     }

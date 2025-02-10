@@ -191,6 +191,8 @@ svg {
 }
 .control-group {
     margin-bottom: 15px;
+    position: relative;
+    z-index: 2;
 }
 .control-group label {
     display: block;
@@ -201,11 +203,15 @@ svg {
 .control-group input {
     width: 100%;
     margin-bottom: 5px;
+    position: relative;
+    z-index: 2;
 }
 .control-group input[type="checkbox"] {
     width: auto;
     margin: 5px 0;
     cursor: pointer;
+    position: relative;
+    z-index: 2;
 }
 .value-display {
     font-size: 10px;
@@ -218,6 +224,8 @@ svg {
     margin-top: 20px;
     padding-top: 15px;
     border-top: 1px solid rgba(212, 163, 115, 0.3);
+    position: relative;
+    z-index: 1;
 }
 .play-button {
     width: 24px;
@@ -239,9 +247,9 @@ svg {
 }
 .path-grid {
     fill: none;
-    stroke: rgba(212, 163, 115, 0.4); /* Increased opacity and slightly darker brown */
-    stroke-width: 1.5; /* Made lines slightly thicker */
-    opacity: 0.6; /* Increased base opacity */
+    stroke: rgba(212, 163, 115, 0.4);
+    stroke-width: 1.5;
+    opacity: 0.6;
     transition: opacity 0.3s ease;
 }
 

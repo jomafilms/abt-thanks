@@ -14,17 +14,6 @@ export default class MarkerManager {
             const namesResponse = await fetch('names.json');
             const namesData = await namesResponse.json();
 
-            // Add our test yellow dot
-            this.staticConfig.markers.push({
-                id: "test-yellow-dot",
-                line: -10,
-                startProgress: 0.4, // 40% from horizon
-                color: "rgba(255, 255, 0, 0.3)", // Yellow with 30% opacity
-                type: "circle",
-                description: "Test yellow dot",
-                canReceiveName: false
-            });
-
             // Assign names to available markers
             this.markersWithNames = this.staticConfig.markers.map(marker => {
                 if (marker.canReceiveName && namesData.names.length > 0) {
@@ -43,18 +32,6 @@ export default class MarkerManager {
 
     renderMarkers(svg, lines, calculateMarkerProgress, worldCurveAt, applyPerspective, hasStarted, scrollProgress) {
         if (!this.staticConfig || !this.markersWithNames) return;
-
-        // Highlight line -10
-        const line10 = lines.find(line => line.number === -10);
-        if (line10) {
-            // Create a copy of line -10's path with a highlight color
-            const highlightPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            highlightPath.setAttribute('d', line10.d);
-            highlightPath.setAttribute('class', 'path-grid');
-            highlightPath.setAttribute('stroke', 'rgba(255, 255, 0, 0.5)');
-            highlightPath.setAttribute('stroke-width', '3');
-            svg.appendChild(highlightPath);
-        }
 
         this.markersWithNames.forEach(marker => {
             // Find the corresponding line for this marker

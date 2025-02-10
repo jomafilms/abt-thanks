@@ -196,6 +196,9 @@
             const steps = 100;
             let d = '';
             
+            // Get current grid visibility state
+            const showGrid = document.getElementById('showGrid').checked;
+            
             // Clear existing paths and grid lines
             svg.innerHTML = '';
             svg.appendChild(horizonLine);
@@ -203,23 +206,25 @@
             // Get current edge line numbers
             const EDGE_LINE_NUMBERS = updatePathEdges(width, BASE_LINE_SPACING, controls.getRawValue('pathWidth'));
             
-            // Add latitude lines
-            for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
-                const t = i / NUM_LATITUDE_LINES;
-                const mt = 1 - t;
-                const y = lerp(HORIZON_Y, height, t * t); // Quadratic interpolation for perspective
-                
-                const latLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                latLine.setAttribute('x1', VANISHING_POINT_X - width * 0.4);
-                latLine.setAttribute('y1', y);
-                latLine.setAttribute('x2', VANISHING_POINT_X + width * 0.4);
-                latLine.setAttribute('y2', y);
-                latLine.setAttribute('class', 'path-grid');
-                latLine.setAttribute('stroke-dasharray', '4 4');
-                svg.appendChild(latLine);
-                
-                // Add percentage label
-                addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(mt * 100).toFixed(0)}%`);
+            // Add latitude lines only if grid is visible
+            if (showGrid) {
+                for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
+                    const t = i / NUM_LATITUDE_LINES;
+                    const mt = 1 - t;
+                    const y = lerp(HORIZON_Y, height, t * t); // Quadratic interpolation for perspective
+                    
+                    const latLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    latLine.setAttribute('x1', VANISHING_POINT_X - width * 0.4);
+                    latLine.setAttribute('y1', y);
+                    latLine.setAttribute('x2', VANISHING_POINT_X + width * 0.4);
+                    latLine.setAttribute('y2', y);
+                    latLine.setAttribute('class', 'path-grid');
+                    latLine.setAttribute('stroke-dasharray', '4 4');
+                    svg.appendChild(latLine);
+                    
+                    // Add percentage label
+                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(mt * 100).toFixed(0)}%`);
+                }
             }
             
             // Get current scroll progress
@@ -246,22 +251,27 @@
                 // Determine if this is within the main path boundaries
                 const isInMainPath = Math.abs(i) < EDGE_LINE_NUMBERS.right;
                 
+                // Always create the grid path
                 gridPath.setAttribute('d', gridD);
                 gridPath.setAttribute('class', 'path-grid');
                 gridPath.style.opacity = isInMainPath ? 0.4 : 0.2;
-                svg.appendChild(gridPath);
                 
-                // Store line info with path element reference
+                // Only append to SVG if grid is visible
+                if (showGrid) {
+                    svg.appendChild(gridPath);
+                }
+                
+                // Store line info with path element reference and path data
                 lines.push({
                     number: i,
                     xOffset,
                     d: gridD,
-                    pathEl: gridPath,  // Store reference to the actual path element
+                    pathEl: gridPath,
                     isInMainPath
                 });
                 
-                // Add line number at bottom
-                if (i % 5 === 0) {
+                // Add line number at bottom if grid is visible
+                if (showGrid && i % 5 === 0) {
                     addDebugText(svg, VANISHING_POINT_X + xOffset, height - 10, i.toString());
                 }
             }
@@ -316,21 +326,56 @@
             updatePath();
         });
         const markerManager = new MarkerManager();
+        let autoScrollInterval = null;
 
         // Grid toggle handler
         document.getElementById('showGrid').addEventListener('change', (e) => {
             const gridLines = document.querySelectorAll('.path-grid');
-            const debugText = document.querySelectorAll('.debug-text');
             gridLines.forEach(line => {
-                if (!e.target.checked) {
-                    line.classList.add('hidden');
+                // Determine if this is a latitude line by checking for dash array
+                const isDashed = line.getAttribute('stroke-dasharray') === '4 4';
+                // Determine if this is a main path line by checking its current opacity
+                const isMainPath = line.style.opacity === '0.4';
+                
+                // Set opacity based on line type
+                let baseOpacity;
+                if (isDashed) {
+                    baseOpacity = '0.6'; // Latitude lines
+                } else if (isMainPath) {
+                    baseOpacity = '0.4'; // Main path lines
                 } else {
-                    line.classList.remove('hidden');
+                    baseOpacity = '0.2'; // Outer lines
                 }
+                
+                line.style.opacity = e.target.checked ? baseOpacity : '0';
             });
-            debugText.forEach(text => {
+            
+            // Also toggle debug text visibility
+            const debugTexts = document.querySelectorAll('.debug-text');
+            debugTexts.forEach(text => {
                 text.style.opacity = e.target.checked ? '0.5' : '0';
             });
+        });
+
+        // Auto-scroll button handler
+        const playButton = document.querySelector('.play-button');
+        playButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event bubbling
+            const playIcon = document.querySelector('.play-icon');
+            const pauseIcon = document.querySelector('.pause-icon');
+            
+            if (autoScrollInterval) {
+                // Stop auto-scroll
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+                playIcon.style.display = '';
+                pauseIcon.style.display = 'none';
+            } else {
+                // Start auto-scroll
+                autoScrollInterval = setInterval(autoScroll, 50);
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = '';
+            }
         });
 
         // Auto-scroll function
