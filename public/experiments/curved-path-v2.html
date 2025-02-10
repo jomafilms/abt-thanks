@@ -106,15 +106,56 @@
         const NUM_LATITUDE_LINES = 10;
         let bounceOffset = 0;
         let hasStarted = false;  // Track if animation has started
-        let scrollProgress = 0;  // Initialize at 0 instead of using baseProgress
+        let scrollWorldDistance = 0;
 
-        // Function to calculate a marker's progress
-        function calculateMarkerProgress(marker) {
-            if (!hasStarted) {
-                return marker.startProgress;
+        // Arc-length table for distance-based parameterization
+        let arcTable = [];
+
+        // Build lookup table mapping curve parameter t to accumulated world distance
+        function buildArcLengthTable(steps = 300) {
+            arcTable = [];
+            let totalDist = 0;
+            
+            // First point
+            let prev = worldCurveAt(0, width, height, HORIZON_Y, controls.getValues(), 0, VIEWPORT_MARGIN, VANISHING_POINT_X);
+            arcTable.push({ t: 0, dist: 0 });
+
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const cur = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), 0, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                
+                // Calculate segment length in world space
+                const dx = cur.x - prev.x;
+                const dy = cur.y - prev.y;
+                const segLen = Math.sqrt(dx * dx + dy * dy);
+                totalDist += segLen;
+                
+                arcTable.push({ t, dist: totalDist });
+                prev = cur;
             }
-            // Calculate progress from the initial position
-            return ((scrollProgress + marker.startProgress) % 1 + 1) % 1;
+        }
+
+        // Convert world distance to curve parameter t
+        function findTforDistance(dist) {
+            if (!arcTable.length) return 0;
+            const totalDist = arcTable[arcTable.length - 1].dist;
+            
+            // Calculate raw t without wrapping the distance
+            let t = dist / totalDist;
+            
+            // Only wrap the final t value for curve mapping
+            t = t - Math.floor(t);
+            
+            // Apply easing for speed variation
+            return t * t;
+        }
+
+        // Function to calculate a marker's progress using world distance
+        function calculateMarkerProgress(marker) {
+            const totalDist = arcTable.length ? arcTable[arcTable.length - 1].dist : 0;
+            // Use raw world distance for continuous motion
+            const markerDist = scrollWorldDistance + (marker.startProgress * totalDist);
+            return findTforDistance(markerDist);
         }
 
         // Helper function to update horizon line position
@@ -123,42 +164,11 @@
             horizonLine.setAttribute('y2', HORIZON_Y + bounceOffset);
         }
 
-        // Update dots based on scroll progress
-        function updateDots() {
-            // Remove old dots
-            const oldDots = svg.querySelectorAll('.dot');
-            oldDots.forEach(dot => dot.remove());
-            
-            // Calculate dot positions
-            const numDots = Math.ceil(1.2 / DOT_SPACING);  // Number of dots to show
-            for (let i = 0; i < numDots; i++) {
-                // Calculate t value for this dot, but keep the base scrollProgress continuous
-                let t = ((scrollProgress % 1.2) + (i * DOT_SPACING)) % 1.2;
-                
-                // Only show dots within our view range
-                if (t >= 0 && t <= 1.2) {
-                    const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
-                    const scale = 0.5 + Math.max(0, t);
-                    const dotSize = 6 * scale;
-                    
-                    // Calculate opacity - fade out as t approaches 1
-                    const opacity = t >= 0.95 ? (1 - (t - 0.95) / 0.05) : 1;
-                    
-                    // Create dot
-                    const dotElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    dotElement.setAttribute('cx', pos.x);
-                    dotElement.setAttribute('cy', pos.y);
-                    dotElement.setAttribute('r', dotSize);
-                    dotElement.setAttribute('class', 'dot');
-                    dotElement.style.opacity = Math.max(0, opacity);
-                    
-                    svg.appendChild(dotElement);
-                }
-            }
-        }
-
         // Update path with perspective
         function updatePath() {
+            // Rebuild arc-length table first
+            buildArcLengthTable();
+            
             const steps = 100;
             let d = '';
             
@@ -188,6 +198,9 @@
                 addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(mt * 100).toFixed(0)}%`);
             }
             
+            // Get current scroll progress
+            const scrollT = findTforDistance(scrollWorldDistance);
+            
             // Add vertical grid lines and store line info
             const lines = [];
             const gridSpacing = BASE_LINE_SPACING;
@@ -200,8 +213,8 @@
                 
                 for (let j = 0; j <= steps; j++) {
                     const t = j / steps;
-                    const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    worldPos.x += xOffset * t; // Add the offset to the world position
+                    const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                    worldPos.x += xOffset * t;
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
                     gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
                 }
@@ -235,7 +248,7 @@
             // Generate points for main path
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
-                const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
+                const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
                 mainPoints.push(pos);
             }
             
@@ -267,20 +280,16 @@
                 svg, 
                 lines, 
                 calculateMarkerProgress,
-                (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollProgress, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
+                (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
                 (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR),
                 hasStarted,
-                scrollProgress
+                scrollWorldDistance
             );
-            
-            // Update dots last so they're on top
-            updateDots();
         }
 
         // Initialize controls and markers
         const controls = new Controls(() => {
             updatePath();
-            updateDots();
         });
         const markerManager = new MarkerManager();
 
@@ -289,32 +298,30 @@
             if (!hasStarted) {
                 hasStarted = true;
             }
-            scrollProgress += 0.001 * controls.getRawValue('sensitivity');
-            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
+            scrollWorldDistance += 2;
+            
+            // Use wrapped scroll value for bounce effect only
+            const wrappedScroll = scrollWorldDistance % 100;
+            bounceOffset = Math.sin(wrappedScroll * (Math.PI * 2 / 100)) * 1.5;
             updateHorizonLine();
             updatePath();
-            updateDots();
         }
 
-        // Update scroll handler to include bounce and progress
+        // Update scroll handler to use world distance
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (!hasStarted) {
                 hasStarted = true;
-                scrollProgress = 0;  // Start from 0 when animation begins
+                scrollWorldDistance = 0;
             }
             
-            const delta = e.deltaY * controls.getRawValue('sensitivity') * 0.001;
-            scrollProgress += delta;
+            const sensitivity = controls.getRawValue('sensitivity');
+            scrollWorldDistance += e.deltaY * sensitivity * 0.1;
             
-            // Update bounce offset based on scroll progress
-            bounceOffset = Math.sin(scrollProgress * Math.PI * 2) * 1.5;
-            
+            // Calculate bounce based on raw scroll distance
+            bounceOffset = Math.sin((scrollWorldDistance / 100) * Math.PI * 2) * 1.5;
             updateHorizonLine();
             updatePath();
-            updateDots();
-            
-            // Stop auto-scroll if user manually scrolls
             controls.stopAutoScroll();
         }, { passive: false });
 
@@ -322,7 +329,6 @@
         async function init() {
             await markerManager.loadConfiguration();
             updatePath();
-            updateDots();
         }
 
         init();
