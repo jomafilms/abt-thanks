@@ -1,9 +1,100 @@
 body {
     margin: 0;
-    background: #111;
     min-height: 100vh;
     overflow: hidden;
 }
+
+/* Sky and clouds */
+.sky-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 40vh; /* Match the horizon line at 40% */
+    z-index: -2;
+    pointer-events: none;
+    background: #B8E1FF;  /* Light blue sky color from reference */
+}
+
+/* Mountains */
+.mountains-container {
+    position: fixed;
+    top: 20vh;
+    left: 0;
+    width: 100vw;
+    height: 35vh;
+    z-index: -1;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* Clip everything below 40vh (horizon line) */
+    clip-path: polygon(0 0, 100% 0, 100% 20vh, 0 20vh);
+}
+
+.mountains {
+    width: 100vw;
+    height: auto;
+    min-width: 100vw;
+    object-fit: cover;
+    object-position: center 30%; /* Adjust vertical position */
+    opacity: 0.8;
+    transform: scale(1.5); /* Increased scale to ensure coverage */
+}
+
+.cloud {
+    position: absolute;
+    opacity: 0.9;
+    will-change: transform;
+}
+
+.cloud1 {
+    width: 300px;
+    top: 15%;
+    animation: floatCloud1 120s linear infinite;
+}
+
+.cloud2 {
+    width: 250px;
+    top: 25%;
+    left: 50%;  /* Start in middle of screen */
+    animation: floatCloud2 180s linear infinite;
+}
+
+.cloud3 {
+    width: 200px;
+    top: 20%;
+    animation: floatCloud3 150s linear infinite;
+}
+
+@keyframes floatCloud1 {
+    from {
+        transform: translateX(-300px);
+    }
+    to {
+        transform: translateX(calc(100vw + 300px));
+    }
+}
+
+@keyframes floatCloud2 {
+    from {
+        transform: translateX(calc(100vw + 250px));
+    }
+    to {
+        transform: translateX(-250px);
+    }
+}
+
+@keyframes floatCloud3 {
+    from {
+        transform: translateX(-200px);
+    }
+    to {
+        transform: translateX(calc(100vw + 200px));
+    }
+}
+
 svg {
     width: 100vw;
     height: 100vh;

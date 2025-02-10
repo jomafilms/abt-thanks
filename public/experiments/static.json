@@ -31,7 +31,7 @@
         },
         {
             "id": "name-marker-2",
-            "line": 2,
+            "line": 3,
             "startProgress": 0.3,
             "color": "#4287f5",
             "type": "rectangle",
