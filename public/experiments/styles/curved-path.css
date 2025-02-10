@@ -125,21 +125,21 @@ svg {
 }
 .path {
     fill: none;
-    stroke: #D4A373;
+    stroke: url(#trailPattern);
     stroke-width: 2;
-    stroke-linecap: round;
-    opacity: 0.5;
-}
-.path-edge {
-    fill: none;
-    stroke: #D4A373;
-    stroke-width: 3;
     stroke-linecap: round;
     opacity: 0.8;
 }
+.path-edge {
+    fill: none;
+    stroke: #8B5E34; /* Darker earth tone for edges */
+    stroke-width: 3;
+    stroke-linecap: round;
+    opacity: 0.7;
+}
 .path-parallel {
     fill: none;
-    stroke: #D4A373;
+    stroke: #8B5E34;
     stroke-width: 2;
     stroke-linecap: round;
     opacity: 0.5;
@@ -196,10 +196,16 @@ svg {
     display: block;
     margin-bottom: 5px;
     font-size: 12px;
+    user-select: none;
 }
 .control-group input {
     width: 100%;
     margin-bottom: 5px;
+}
+.control-group input[type="checkbox"] {
+    width: auto;
+    margin: 5px 0;
+    cursor: pointer;
 }
 .value-display {
     font-size: 10px;
@@ -233,24 +239,30 @@ svg {
 }
 .path-grid {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.3);
-    stroke-width: 1;
-    opacity: 0.4;
+    stroke: rgba(212, 163, 115, 0.4); /* Increased opacity and slightly darker brown */
+    stroke-width: 1.5; /* Made lines slightly thicker */
+    opacity: 0.6; /* Increased base opacity */
+    transition: opacity 0.3s ease;
 }
+
+.path-grid.hidden {
+    opacity: 0;
+}
+
 .debug-text {
     fill: rgba(255, 255, 255, 0.5);
     font-size: 12px;
     font-family: monospace;
 }
 
-/* Ground */
+/* Ground effects */
 .ground {
     position: fixed;
-    top: 40vh; /* Start at horizon */
+    top: 40vh;
     left: 0;
     width: 100vw;
     height: 60vh;
-    z-index: -1;
+    z-index: -3;
     pointer-events: none;
     background: linear-gradient(
         to bottom,
@@ -259,4 +271,65 @@ svg {
         #F0C69F 100%
     );
     opacity: 0.3;
-} 
+}
+
+.ground-fog {
+    position: fixed;
+    top: 40vh;
+    left: 0;
+    width: 100vw;
+    height: 30vh;
+    z-index: -2;
+    pointer-events: none;
+    background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.15) 0%,
+        rgba(255,255,255,0.05) 40%,
+        transparent 100%
+    );
+}
+
+.ground-texture {
+    position: fixed;
+    top: 40vh;
+    left: 0;
+    width: 100vw;
+    height: 60vh;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.07;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    background-size: 150px;
+    animation: textureShift 30s linear infinite;
+}
+
+@keyframes textureShift {
+    from {
+        background-position: 0 0;
+    }
+    to {
+        background-position: 150px 0;
+    }
+}
+
+/* Add trail texture pattern definition to your SVG */
+#trailPattern {
+    width: 100%;
+    height: 8px;
+}
+
+#trailNoiseFilter feDisplacementMap {
+    animation: displacementShift 10s linear infinite;
+}
+
+@keyframes displacementShift {
+    0% {
+        scale: 0;
+    }
+    50% {
+        scale: 2;
+    }
+    100% {
+        scale: 0;
+    }
+}
