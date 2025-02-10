@@ -108,7 +108,7 @@ export default function Home() {
           <div 
             className="h-full w-[400vw]" 
             style={{
-              backgroundImage: 'url(/images/trees-bg1.png)',
+              backgroundImage: 'none',
               backgroundRepeat: 'repeat-x',
               backgroundSize: 'auto 100%',
               opacity: 0.4
