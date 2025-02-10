@@ -209,6 +209,27 @@
             
             // Add latitude lines only if grid is visible
             if (showGrid) {
+                // First, find the t-value at our reference y-position (0.85)
+                const referenceY = height * 0.85;
+                let referenceT = 0;
+                let minDist = Infinity;
+                
+                for (let j = 0; j <= 100; j++) {
+                    const searchT = j / 100;
+                    const worldPos = worldCurveAt(searchT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - searchT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
+                    
+                    const dist = Math.abs(pos.y - referenceY);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        referenceT = searchT;
+                    }
+                }
+                
+                // Add a debug label for our reference point
+                addDebugText(svg, VANISHING_POINT_X - width * 0.45, referenceY, `ref: ${referenceT.toFixed(3)}`);
+
+                // Now add the regular latitude lines
                 for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
                     const t = i / NUM_LATITUDE_LINES;
                     const mt = 1 - t;
@@ -223,8 +244,25 @@
                     latLine.setAttribute('stroke-dasharray', '4 4');
                     svg.appendChild(latLine);
                     
-                    // Add percentage label with new coordinate system
-                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, `${(t * 100).toFixed(0)}%`);
+                    // Find the actual t-value for this y-position
+                    let bestT = 0;
+                    let closestDist = Infinity;
+                    const searchSteps = 50;
+                    
+                    for (let j = 0; j <= searchSteps; j++) {
+                        const searchT = j / searchSteps;
+                        const worldPos = worldCurveAt(searchT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
+                        const pos = applyPerspective(worldPos.x, worldPos.y, 1 - searchT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
+                        
+                        const dist = Math.abs(pos.y - y);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            bestT = searchT;
+                        }
+                    }
+                    
+                    // Add percentage label showing actual path t-value
+                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, bestT.toFixed(2));
                 }
             }
             
@@ -273,7 +311,9 @@
                 
                 // Add line number labels at bottom, tied to paths
                 if (showGrid && i % 5 === 0) {
-                    const fixedY = height * 0.85; // Our target y-position
+                    // Position numbers 10px from bottom of screen
+                    const bottomOffset = 10;
+                    const fixedY = height - bottomOffset;
                     
                     // Find where the path intersects with our fixed y-position
                     let bestT = 0;
@@ -299,6 +339,7 @@
                     worldPos.x += xOffset * bestT;
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - bestT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
                     
+                    // Add the line number
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('x', pos.x);
                     text.setAttribute('y', fixedY);
@@ -308,6 +349,15 @@
                     text.setAttribute('text-anchor', 'middle');
                     text.textContent = i.toString();
                     svg.appendChild(text);
+                    
+                    // Add a small dot to verify position
+                    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    dot.setAttribute('cx', pos.x);
+                    dot.setAttribute('cy', fixedY);
+                    dot.setAttribute('r', '2');
+                    dot.setAttribute('fill', '#D4A373');
+                    dot.setAttribute('opacity', '0.4');
+                    svg.appendChild(dot);
                 }
             }
             
