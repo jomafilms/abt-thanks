@@ -64,5 +64,39 @@
             "cornerRadius": 0.2,
             "fontScale": 0.8
         }
+    },
+    "staticObjects": {
+        "templates": {
+            "pine-tree": {
+                "type": "svg",
+                "render": "tree",
+                "variant": "pine",
+                "baseSize": "medium",
+                "baseColor": "#2A9D8F"
+            },
+            "round-tree": {
+                "type": "svg",
+                "render": "tree",
+                "variant": "round",
+                "baseSize": "medium",
+                "baseColor": "#64C2A6"
+            },
+            "slim-tree": {
+                "type": "svg",
+                "render": "tree",
+                "variant": "slim",
+                "baseSize": "medium",
+                "baseColor": "#1D3B4A"
+            }
+        },
+        "placements": [
+            {
+                "template": "pine-tree",
+                "positions": [
+                    { "line": -12, "progress": 0.6 }
+                ],
+                "size": "large"
+            }
+        ]
     }
 } 

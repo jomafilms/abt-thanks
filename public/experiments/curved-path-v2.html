@@ -93,6 +93,7 @@
         import { lerp, clamp, worldCurveAt, applyPerspective, curveAt, getPathWidth, updatePathEdges, addDebugText } from './js/path-calculations.js';
         import { Controls } from './js/controls.js';
         import MarkerManager from './js/markers.js';
+        import StaticObjectManager from './js/staticObjects.js';
 
         // Get viewport dimensions
         const width = window.innerWidth;
@@ -319,13 +320,23 @@
                 hasStarted,
                 scrollWorldDistance
             );
+
+            // Add static objects
+            staticObjectManager.renderObjects(
+                svg,
+                lines,
+                calculateMarkerProgress,
+                (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
+                (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR)
+            );
         }
 
-        // Initialize controls and markers
+        // Initialize controls and managers
         const controls = new Controls(() => {
             updatePath();
         });
         const markerManager = new MarkerManager();
+        const staticObjectManager = new StaticObjectManager();
         let autoScrollInterval = null;
 
         // Grid toggle handler
@@ -413,6 +424,7 @@
         // Initialize
         async function init() {
             await markerManager.loadConfiguration();
+            await staticObjectManager.loadConfiguration();
             updatePath();
         }
 
