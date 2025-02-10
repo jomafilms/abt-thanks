@@ -12,10 +12,21 @@ html, body {
     top: 0;
     left: 0;
     width: 100%;
-    height: var(--horizon-y, 40%); /* Use CSS variable with fallback */
-    z-index: -2;
+    height: var(--horizon-y, 40%);
+    z-index: -3; /* Move sky behind mountains */
     pointer-events: none;
-    background: #B8E1FF;  /* Light blue sky color from reference */
+    background: #B8E1FF;
+}
+
+/* Clouds container */
+.clouds-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--horizon-y, 40%);
+    z-index: -1; /* Keep clouds in front of mountains */
+    pointer-events: none;
 }
 
 /* Mountains */
@@ -25,7 +36,7 @@ html, body {
     left: 0;
     width: 100%;
     height: var(--horizon-y, 40%);
-    z-index: -1;
+    z-index: -2;
     pointer-events: none;
     display: flex;
     align-items: center;
