@@ -35,30 +35,49 @@ export default class StaticObjectManager {
                 const totalLength = objectLine.pathEl.getTotalLength();
                 const point = objectLine.pathEl.getPointAtLength(totalLength * t);
 
-                // Get scale factor from placement or template (default to 1)
-                const scaleFactor = placement.scale || template.scale || 1;
+                // Get base scale factor from placement or template (default to 1)
+                const baseScaleFactor = placement.scale || template.scale || 1;
+                // Apply position-specific scale multiplier if it exists
+                const positionScale = pos.scale || 1;
+                const finalScale = baseScaleFactor * positionScale;
                 
                 // Base size calculation (similar to markers)
                 const MIN_SIZE = 2;  // Match marker min size
                 const BASE_MAX_SIZE = 100; // Base max size for scale factor 1
-                const maxSize = BASE_MAX_SIZE * scaleFactor;
+                const maxSize = BASE_MAX_SIZE * finalScale;
+
+                // Size multiplier based on template size
+                const sizeMultiplier = {
+                    'small': 0.7,
+                    'medium': 1.0,
+                    'large': 1.4
+                }[placement.size || 'medium'] || 1.0;
 
                 // Reach full size at t = 0.8 (20% from bottom)
                 const growthProgress = Math.min(t / 0.8, 1);
-                const currentSize = MIN_SIZE + (maxSize - MIN_SIZE) * growthProgress;
+                const currentSize = MIN_SIZE + (maxSize - MIN_SIZE) * growthProgress * sizeMultiplier;
+
+                // Calculate dissolve effect after t = 0.8
+                let opacity = 1;
+                if (t > 0.8) {
+                    // Linear fade out from t=0.8 to t=1
+                    opacity = 1 - ((t - 0.8) / 0.2);
+                }
 
                 // Create and render the object based on its type
                 if (template.type === 'svg' && template.render === 'tree') {
-                    this.renderTree(svg, point, template, placement, currentSize);
+                    this.renderTree(svg, point, template, placement, currentSize, opacity);
                 }
             });
         });
     }
 
-    renderTree(svg, pos, template, placement, size) {
+    renderTree(svg, pos, template, placement, size, opacity) {
         // Create tree group with exact position
         const treeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
         treeGroup.setAttribute('transform', `translate(${pos.x - size/2},${pos.y - size})`);
+        treeGroup.setAttribute('class', 'dissolving-object');
+        treeGroup.style.opacity = opacity;
 
         // Render based on variant
         switch (template.variant) {

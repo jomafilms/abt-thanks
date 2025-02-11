@@ -93,9 +93,23 @@
             {
                 "template": "pine-tree",
                 "positions": [
-                    { "line": -12, "progress": 0.6 }
+                    { "line": -12, "progress": 0.6, "scale": 5.0 }
                 ],
                 "size": "large"
+            },
+            {
+                "template": "round-tree",
+                "positions": [
+                    { "line": -8, "progress": 0.3, "scale": 2.5 }
+                ],
+                "size": "medium"
+            },
+            {
+                "template": "slim-tree",
+                "positions": [
+                    { "line": -15, "progress": 0.8, "scale": 3.0 }
+                ],
+                "size": "small"
             }
         ]
     }

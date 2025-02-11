@@ -357,3 +357,8 @@ svg {
         scale: 0;
     }
 }
+
+.dissolving-object {
+    transition: opacity 0.3s ease-out;
+    will-change: opacity;
+}
