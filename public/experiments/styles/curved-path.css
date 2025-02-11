@@ -409,3 +409,54 @@ svg.gear-icon {
     height: 24px !important;
     z-index: 1002;  /* Higher than controls panel */
 }
+
+.path-fill {
+    fill: url(#chipPattern);
+    opacity: 0.8;
+    pointer-events: none;
+    stroke: none;
+    mix-blend-mode: multiply;
+}
+
+.path-area {
+    fill: white;
+    stroke: none;
+    pointer-events: none;
+}
+
+/* For debugging */
+#chipPattern {
+    background-color: rgba(255, 0, 0, 0.1); /* Just to see if pattern is working */
+}
+
+/* Ensure SVG structure is preserved */
+#scene {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+#scene defs {
+    position: absolute;
+}
+
+#scene #static-elements {
+    position: absolute;
+    pointer-events: none;
+}
+
+#scene #dynamic-elements {
+    position: absolute;
+    pointer-events: none;
+}
+
+/* Re-enable pointer events for specific elements */
+#scene #dynamic-elements .path,
+#scene #dynamic-elements .path-edge,
+#scene #dynamic-elements .path-parallel {
+    pointer-events: auto;
+}

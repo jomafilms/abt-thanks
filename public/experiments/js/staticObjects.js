@@ -45,6 +45,10 @@ export default class StaticObjectManager {
                     .then(svgContent => {
                         console.log('Successfully loaded SVG:', template.image);
                         this.imageCache.set(template.image, svgContent);
+                        // Once we have the chips SVG, update the pattern
+                        if (template.render === 'chips') {
+                            this.updateChipPattern(svgContent);
+                        }
                     })
                     .catch(error => {
                         console.error('Failed to load SVG:', template.image, error);
@@ -56,66 +60,213 @@ export default class StaticObjectManager {
         await Promise.all(svgPromises);
     }
 
+    updateChipPattern(svgContent) {
+        // Find the main SVG and pattern element
+        const mainSvg = document.getElementById('scene');
+        if (!mainSvg) {
+            console.error('Main SVG element not found');
+            return;
+        }
+
+        const pattern = mainSvg.querySelector('#chipPattern');
+        if (!pattern) {
+            console.error('Chip pattern element not found in main SVG');
+            return;
+        }
+
+        console.log('Updating chip pattern...');
+
+        // Clear any existing content
+        while (pattern.firstChild) {
+            pattern.removeChild(pattern.firstChild);
+        }
+
+        // Parse the SVG content
+        const div = document.createElement('div');
+        div.innerHTML = svgContent;
+        const svgElement = div.querySelector('svg');
+        
+        if (svgElement) {
+            // Extract viewBox and content
+            const viewBox = svgElement.getAttribute('viewBox');
+            console.log('Original viewBox:', viewBox);
+            
+            // Create a background rect for debugging
+            const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bgRect.setAttribute('width', '50');
+            bgRect.setAttribute('height', '50');
+            bgRect.setAttribute('fill', '#D4A373');
+            bgRect.setAttribute('opacity', '0.2');
+            pattern.appendChild(bgRect);
+
+            // Create larger, more visible chips
+            const positions = [
+                { x: 10, y: 10, rotate: 0, scale: 1.2 },
+                { x: 35, y: 15, rotate: 45, scale: 1.0 },
+                { x: 15, y: 35, rotate: -30, scale: 1.1 },
+                { x: 40, y: 40, rotate: 15, scale: 0.9 }
+            ];
+
+            // Extract the inner content of the SVG
+            const content = svgElement.innerHTML;
+            console.log('SVG content length:', content.length);
+
+            positions.forEach((pos, index) => {
+                const chipSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                chipSvg.setAttribute('viewBox', viewBox);
+                const size = 30 * pos.scale; // Larger base size
+                chipSvg.setAttribute('width', size.toString());
+                chipSvg.setAttribute('height', size.toString());
+                chipSvg.setAttribute('x', pos.x.toString());
+                chipSvg.setAttribute('y', pos.y.toString());
+                chipSvg.setAttribute('transform', `rotate(${pos.rotate}, ${pos.x + size/2}, ${pos.y + size/2})`);
+                chipSvg.innerHTML = content;
+                pattern.appendChild(chipSvg);
+                console.log(`Added chip ${index + 1} at (${pos.x}, ${pos.y}) with size ${size}`);
+            });
+
+            console.log('Successfully updated chip pattern');
+        } else {
+            console.error('Failed to parse SVG element from content');
+        }
+    }
+
     renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
         if (!this.config) return;
 
-        // Collect all objects with their calculated properties first
-        const objectsToRender = [];
+        // Ensure we're using the main SVG element
+        const mainSvg = svg.closest('svg') || document.getElementById('scene');
+        if (!mainSvg) {
+            console.error('Main SVG element not found');
+            return;
+        }
 
+        // Clear existing objects before rendering new ones
+        const existingObjects = mainSvg.querySelectorAll('.dissolving-object');
+        existingObjects.forEach(obj => obj.remove());
+
+        // Get the viewport dimensions from the SVG
+        const width = mainSvg.clientWidth;
+        const height = mainSvg.clientHeight;
+        const HORIZON_Y = height * 0.4;
+        const VANISHING_POINT_X = width * 0.5;
+
+        // First verify the SVG structure
+        const defs = mainSvg.querySelector('defs');
+        const mask = defs?.querySelector('#pathMask');
+        const pathArea = mask?.querySelector('.path-area');
+        const staticElements = mainSvg.querySelector('#static-elements');
+        const pathFill = staticElements?.querySelector('.path-fill');
+
+        // Log detailed structure information
+        console.log('SVG Structure Check:', {
+            svgId: mainSvg.id,
+            originalElementId: svg.id,
+            svgChildCount: mainSvg.children.length,
+            defsExists: !!defs,
+            defsChildCount: defs?.children.length,
+            maskExists: !!mask,
+            maskChildCount: mask?.children.length,
+            pathAreaExists: !!pathArea,
+            staticElementsExists: !!staticElements,
+            pathFillExists: !!pathFill,
+            pathAreaClass: pathArea?.getAttribute('class'),
+            pathFillClass: pathFill?.getAttribute('class')
+        });
+        
+        // Update the path mask with the current path shape
+        if (pathArea && pathFill) {
+            // Find the edge lines
+            const leftEdgeLine = lines.find(line => line.number === -2);  // Explicitly look for line -2
+            const rightEdgeLine = lines.find(line => line.number === 2);  // Explicitly look for line 2
+
+            if (leftEdgeLine && rightEdgeLine) {
+                // Create a path that encompasses the area between the edge lines
+                const pathD = `M ${VANISHING_POINT_X} ${HORIZON_Y} ${leftEdgeLine.d.substring(leftEdgeLine.d.indexOf('L'))} L ${rightEdgeLine.d.split('L').reverse().join(' L ')} Z`;
+                
+                // Log the path data being set
+                console.log('Setting path data:', {
+                    pathDLength: pathD.length,
+                    pathDStart: pathD.substring(0, 100) + '...',
+                    leftEdgeExists: !!leftEdgeLine.d,
+                    rightEdgeExists: !!rightEdgeLine.d,
+                    pathAreaBefore: pathArea.getAttribute('d'),
+                    pathFillBefore: pathFill.getAttribute('d')
+                });
+                
+                // Set the path data
+                pathArea.setAttribute('d', pathD);
+                pathFill.setAttribute('d', pathD);
+                
+                console.log('Path data set successfully:', {
+                    pathAreaAfter: pathArea.getAttribute('d')?.length,
+                    pathFillAfter: pathFill.getAttribute('d')?.length
+                });
+            } else {
+                console.warn('Edge lines not found:', { 
+                    leftEdge: leftEdgeLine?.number, 
+                    rightEdge: rightEdgeLine?.number,
+                    totalLines: lines.length,
+                    lineNumbers: lines.map(l => l.number).join(', ')
+                });
+            }
+        } else {
+            console.warn('Path elements not found:', { 
+                svgId: mainSvg.id,
+                originalElementId: svg.id,
+                svgChildCount: mainSvg.children.length,
+                defsExists: !!defs,
+                defsContent: defs?.innerHTML.substring(0, 100) + '...',
+                maskExists: !!mask,
+                pathArea: !!pathArea,
+                pathFill: !!pathFill,
+                staticElementsExists: !!staticElements,
+                fullSvgHtml: mainSvg.outerHTML.substring(0, 200) + '...'
+            });
+        }
+
+        // Use mainSvg for rendering trees
+        const objectsToRender = [];
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
-            if (!template) {
-                console.log('Template not found:', placement.template);
+            if (!template || template.render === 'chips') {
                 return;
             }
 
             placement.positions.forEach(pos => {
                 // Calculate progress exactly like markers do
                 const t = calculateProgress({ startProgress: pos.progress });
-                if (t < 0 || t > 1) {
-                    console.log('Object out of view range:', placement.template, t);
-                    return;
-                }
+                if (t < 0 || t > 1) return;
 
                 // Find the corresponding line for this object
                 const objectLine = lines.find(line => line.number === pos.line);
-                if (!objectLine || !objectLine.pathEl) {
-                    console.log('Line not found for object:', placement.template, pos.line);
-                    return;
-                }
+                if (!objectLine || !objectLine.pathEl) return;
 
                 // Get the total length of the path and point
                 const totalLength = objectLine.pathEl.getTotalLength();
                 const point = objectLine.pathEl.getPointAtLength(totalLength * t);
 
-                // Get base scale factor from placement or template (default to 1)
+                // Calculate size and opacity
                 const baseScaleFactor = placement.scale || template.scale || 1;
-                // Apply position-specific scale multiplier if it exists
                 const positionScale = pos.scale || 1;
                 const finalScale = baseScaleFactor * positionScale;
                 
-                // Base size calculation using viewport-relative units
-                const MIN_SIZE = this.baseMaxSize * 0.02;  // 2% of base size
+                const MIN_SIZE = this.baseMaxSize * 0.02;
                 const maxSize = this.baseMaxSize * finalScale;
-
-                // Size multiplier based on template size
                 const sizeMultiplier = {
                     'small': 0.7,
                     'medium': 1.0,
                     'large': 1.4
                 }[placement.size || 'medium'] || 1.0;
 
-                // Reach full size at t = 0.8 (20% from bottom)
                 const growthProgress = Math.min(t / 0.8, 1);
                 const currentSize = MIN_SIZE + (maxSize - MIN_SIZE) * growthProgress * sizeMultiplier;
 
-                // Calculate dissolve effect after t = 0.8
                 let opacity = 1;
                 if (t > 0.8) {
                     opacity = 1 - ((t - 0.8) / 0.2);
                 }
 
-                // Store object data for sorting
                 objectsToRender.push({
                     t,
                     point,
@@ -127,20 +278,11 @@ export default class StaticObjectManager {
             });
         });
 
-        console.log('Objects to render:', objectsToRender.length);
-
-        // Sort objects by progress (t) - lower t values (further away) first
+        // Sort and render objects
         objectsToRender.sort((a, b) => a.t - b.t);
-
-        // Render objects in sorted order
         objectsToRender.forEach(obj => {
-            if (obj.template.type === 'svg') {
-                if (obj.template.render === 'tree') {
-                    this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
-                } else if (obj.template.render === 'chips' && obj.template.image) {
-                    console.log('Rendering chips:', obj.template.image);
-                    this.renderChips(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
-                }
+            if (obj.template.type === 'svg' && obj.template.render === 'tree') {
+                this.renderTree(mainSvg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
             }
         });
     }

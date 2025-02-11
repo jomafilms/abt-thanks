@@ -85,8 +85,42 @@
     </div>
 
     <svg id="scene">
-        <line class="horizon-line" x1="0" y1="0" x2="0" y2="0"/>
-        <path class="path"/>
+        <defs>
+            <!-- Trail texture pattern -->
+            <pattern id="trailPattern" patternUnits="userSpaceOnUse" width="100" height="8">
+                <rect width="100" height="8" fill="#D4A373" opacity="0.4"/>
+                <filter id="trailNoiseFilter">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" stitchTiles="stitch"/>
+                    <feDisplacementMap in="SourceGraphic" scale="2"/>
+                </filter>
+            </pattern>
+            
+            <!-- Chip pattern - reduced size for denser tiling -->
+            <pattern id="chipPattern" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+                <!-- Debug rectangle to verify pattern is working -->
+                <rect width="50" height="50" fill="#D4A373" opacity="0.2"/>
+                <!-- SVG content will be populated here -->
+            </pattern>
+            
+            <!-- Path mask -->
+            <mask id="pathMask">
+                <rect x="0" y="0" width="100%" height="100%" fill="black"/>
+                <path class="path-area" d="" fill="white"/>
+            </mask>
+        </defs>
+        
+        <!-- Static elements that should not be cleared -->
+        <g id="static-elements">
+            <!-- Filled path with chip pattern (render this first) -->
+            <path class="path-fill" d="" mask="url(#pathMask)" fill="url(#chipPattern)" opacity="0.8"/>
+        </g>
+        
+        <!-- Container for dynamic elements (these will be cleared and redrawn) -->
+        <g id="dynamic-elements">
+            <line class="horizon-line" x1="0" y1="0" x2="0" y2="0"/>
+            <path class="path"/>
+            <path class="path-edge"/>
+        </g>
     </svg>
 
     <div class="ground-fog">
@@ -102,17 +136,25 @@
         let width = window.innerWidth;
         let height = window.innerHeight;
         
-        // Create the paths
+        // Get the paths
         const svg = document.getElementById('scene');
+        const dynamicElements = svg.querySelector('#dynamic-elements');
+        
+        // Clear any existing content in dynamic-elements only
+        while (dynamicElements.firstChild) {
+            dynamicElements.removeChild(dynamicElements.firstChild);
+        }
+        
+        // Create initial paths
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
         
         path.setAttribute('class', 'path');
         horizonLine.setAttribute('class', 'horizon-line');
         
-        // Append initial SVG elements
-        svg.appendChild(horizonLine);
-        svg.appendChild(path);
+        // Append initial SVG elements to dynamic-elements group
+        dynamicElements.appendChild(horizonLine);
+        dynamicElements.appendChild(path);
         
         // Constants for perspective and path - these will be updated on resize
         let HORIZON_Y = height * 0.4;
@@ -198,9 +240,20 @@
             // Get current grid visibility state
             const showGrid = document.getElementById('showGrid').checked;
             
-            // Clear existing paths and grid lines
-            svg.innerHTML = '';
-            svg.appendChild(horizonLine);
+            // Clear existing paths and grid lines from dynamic-elements only
+            const dynamicElements = svg.querySelector('#dynamic-elements');
+            while (dynamicElements.firstChild) {
+                dynamicElements.removeChild(dynamicElements.firstChild);
+            }
+            
+            // Re-add horizon line
+            const horizonLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            horizonLine.setAttribute('class', 'horizon-line');
+            horizonLine.setAttribute('x1', '0');
+            horizonLine.setAttribute('y1', HORIZON_Y + bounceOffset);
+            horizonLine.setAttribute('x2', width);
+            horizonLine.setAttribute('y2', HORIZON_Y + bounceOffset);
+            dynamicElements.appendChild(horizonLine);
             
             // Get current edge line numbers
             const EDGE_LINE_NUMBERS = updatePathEdges(width, BASE_LINE_SPACING, controls.getRawValue('pathWidth'));
@@ -225,7 +278,7 @@
                 }
                 
                 // Add a debug label for our reference point
-                addDebugText(svg, VANISHING_POINT_X - width * 0.45, referenceY, `ref: ${referenceT.toFixed(3)}`);
+                addDebugText(dynamicElements, VANISHING_POINT_X - width * 0.45, referenceY, `ref: ${referenceT.toFixed(3)}`);
 
                 // Now add the regular latitude lines
                 for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
@@ -240,7 +293,9 @@
                     latLine.setAttribute('y2', y);
                     latLine.setAttribute('class', 'path-grid');
                     latLine.setAttribute('stroke-dasharray', '4 4');
-                    svg.appendChild(latLine);
+                    if (showGrid) {
+                        dynamicElements.appendChild(latLine);
+                    }
                     
                     // Find the actual t-value for this y-position
                     let bestT = 0;
@@ -260,7 +315,9 @@
                     }
                     
                     // Add percentage label showing actual path t-value
-                    addDebugText(svg, VANISHING_POINT_X + width * 0.42, y, bestT.toFixed(2));
+                    if (showGrid) {
+                        addDebugText(dynamicElements, VANISHING_POINT_X + width * 0.42, y, bestT.toFixed(2));
+                    }
                 }
             }
             
@@ -293,7 +350,7 @@
                 
                 // Only append to SVG if grid is visible
                 if (showGrid) {
-                    svg.appendChild(gridPath);
+                    dynamicElements.appendChild(gridPath);
                 }
                 
                 // Store line info with path element reference and path data
@@ -344,7 +401,7 @@
                     text.setAttribute('opacity', '0.4');
                     text.setAttribute('text-anchor', 'middle');
                     text.textContent = i.toString();
-                    svg.appendChild(text);
+                    dynamicElements.appendChild(text);
                     
                     // Add a small dot to verify position
                     const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -353,7 +410,7 @@
                     dot.setAttribute('r', '2');
                     dot.setAttribute('fill', '#D4A373');
                     dot.setAttribute('opacity', '0.4');
-                    svg.appendChild(dot);
+                    dynamicElements.appendChild(dot);
                 }
             }
             
@@ -377,7 +434,7 @@
             const mainPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
             mainPath.setAttribute('class', 'path');
             mainPath.setAttribute('d', d);
-            svg.appendChild(mainPath);
+            dynamicElements.appendChild(mainPath);
             
             // Add edge paths
             [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
@@ -387,12 +444,12 @@
                 const edgePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 edgePath.setAttribute('d', edgeLine.d);
                 edgePath.setAttribute('class', 'path-edge');
-                svg.appendChild(edgePath);
+                dynamicElements.appendChild(edgePath);
             });
             
             // Add markers
             markerManager.renderMarkers(
-                svg, 
+                dynamicElements, 
                 lines, 
                 calculateMarkerProgress,
                 (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
@@ -403,7 +460,7 @@
 
             // Add static objects
             staticObjectManager.renderObjects(
-                svg,
+                dynamicElements,
                 lines,
                 calculateMarkerProgress,
                 (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
