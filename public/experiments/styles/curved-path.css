@@ -179,6 +179,7 @@ svg {
     font-family: sans-serif;
     min-width: 200px;
     transition: opacity 0.3s ease-out;
+    z-index: 1001;  /* Lower than gear icon */
 }
 .controls.collapsed {
     opacity: 0;
@@ -191,15 +192,21 @@ svg {
     position: fixed;
     right: 20px;
     top: 20px;
-    width: 24px;
-    height: 24px;
+    width: 24px !important;
+    height: 24px !important;
     cursor: pointer;
     color: #D4A373;
     background: rgba(0, 0, 0, 0.8);
     padding: 8px;
     border-radius: 50%;
     z-index: 1000;
+    overflow: visible;
 }
+
+.gear-icon path {
+    fill: currentColor;
+}
+
 .controls-content {
     margin-top: 15px;
     transition: opacity 0.2s ease-out;
@@ -243,8 +250,8 @@ svg {
     z-index: 1;
 }
 .play-button {
-    width: 24px;
-    height: 24px;
+    width: 24px !important;
+    height: 24px !important;
     cursor: pointer;
     background: none;
     border: none;
@@ -253,10 +260,23 @@ svg {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
+
+.play-button svg {
+    width: 24px !important;
+    height: 24px !important;
+    position: relative !important;
+}
+
 .play-button:hover {
     color: #e4b383;
 }
+
+.play-icon, .pause-icon {
+    fill: currentColor;
+}
+
 .auto-scroll-label {
     font-size: 12px;
 }
@@ -361,4 +381,31 @@ svg {
 .dissolving-object {
     transition: opacity 0.3s ease-out;
     will-change: opacity;
+}
+
+/* Main scene SVG */
+svg#scene {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;  /* Allow clicking through the SVG */
+}
+
+/* SVG elements that need interaction */
+.path, .path-edge, .path-parallel {
+    pointer-events: auto;  /* Re-enable pointer events for specific elements */
+}
+
+/* Override the gear icon position */
+svg.gear-icon {
+    position: fixed;
+    right: 20px !important;  /* Force right alignment */
+    left: auto !important;   /* Remove any left positioning */
+    top: 20px;
+    width: 24px !important;
+    height: 24px !important;
+    z-index: 1002;  /* Higher than controls panel */
 }
