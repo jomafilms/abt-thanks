@@ -32,6 +32,9 @@ export default class StaticObjectManager {
     renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
         if (!this.config) return;
 
+        // Collect all objects with their calculated properties first
+        const objectsToRender = [];
+
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
             if (!template) return;
@@ -45,7 +48,7 @@ export default class StaticObjectManager {
                 const objectLine = lines.find(line => line.number === pos.line);
                 if (!objectLine || !objectLine.pathEl) return;
 
-                // Get the total length of the path and point, exactly like markers
+                // Get the total length of the path and point
                 const totalLength = objectLine.pathEl.getTotalLength();
                 const point = objectLine.pathEl.getPointAtLength(totalLength * t);
 
@@ -73,15 +76,29 @@ export default class StaticObjectManager {
                 // Calculate dissolve effect after t = 0.8
                 let opacity = 1;
                 if (t > 0.8) {
-                    // Linear fade out from t=0.8 to t=1
                     opacity = 1 - ((t - 0.8) / 0.2);
                 }
 
-                // Create and render the object based on its type
-                if (template.type === 'svg' && template.render === 'tree') {
-                    this.renderTree(svg, point, template, placement, currentSize, opacity);
-                }
+                // Store object data for sorting
+                objectsToRender.push({
+                    t,
+                    point,
+                    template,
+                    placement,
+                    currentSize,
+                    opacity
+                });
             });
+        });
+
+        // Sort objects by progress (t) - lower t values (further away) first
+        objectsToRender.sort((a, b) => a.t - b.t);
+
+        // Render objects in sorted order
+        objectsToRender.forEach(obj => {
+            if (obj.template.type === 'svg' && obj.template.render === 'tree') {
+                this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+            }
         });
     }
 
