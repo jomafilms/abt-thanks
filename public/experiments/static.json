@@ -93,7 +93,7 @@
             {
                 "template": "pine-tree",
                 "positions": [
-                    { "line": -12, "progress": 0.6, "scale": 5.0 }
+                    { "line": -12, "progress": 0.6, "scale": 3.0 }
                 ],
                 "size": "large"
             },
@@ -107,7 +107,9 @@
             {
                 "template": "slim-tree",
                 "positions": [
-                    { "line": -15, "progress": 0.8, "scale": 3.0 }
+                    { "line": -7, "progress": 0.35, "scale": 2.5 },
+                    { "line": -9, "progress": 0.25, "scale": 2.5 },
+                    { "line": -15, "progress": 0.8, "scale": 2.0 }
                 ],
                 "size": "small"
             }

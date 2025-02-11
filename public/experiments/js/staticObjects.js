@@ -1,6 +1,20 @@
 export default class StaticObjectManager {
     constructor() {
         this.config = null;
+        this.baseMaxSize = this.calculateBaseMaxSize();
+        
+        // Add resize listener
+        window.addEventListener('resize', () => {
+            this.baseMaxSize = this.calculateBaseMaxSize();
+        });
+    }
+
+    calculateBaseMaxSize() {
+        // Use viewport width to calculate base size
+        // This ensures objects scale with the viewport
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        return Math.min(vw, vh) * 0.1; // 10% of the smaller viewport dimension
     }
 
     async loadConfiguration() {
@@ -41,10 +55,9 @@ export default class StaticObjectManager {
                 const positionScale = pos.scale || 1;
                 const finalScale = baseScaleFactor * positionScale;
                 
-                // Base size calculation (similar to markers)
-                const MIN_SIZE = 2;  // Match marker min size
-                const BASE_MAX_SIZE = 100; // Base max size for scale factor 1
-                const maxSize = BASE_MAX_SIZE * finalScale;
+                // Base size calculation using viewport-relative units
+                const MIN_SIZE = this.baseMaxSize * 0.02;  // 2% of base size
+                const maxSize = this.baseMaxSize * finalScale;
 
                 // Size multiplier based on template size
                 const sizeMultiplier = {
