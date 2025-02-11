@@ -159,6 +159,18 @@ svg {
     stroke-linecap: round;
     opacity: 0.5;
 }
+.path-grid {
+    fill: none;
+    stroke: rgba(212, 163, 115, 0.4);
+    stroke-width: 1.5;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.path-grid.hidden {
+    opacity: 0;
+}
+
 .horizon-line {
     stroke: #D4A373;
     stroke-width: 1;
@@ -280,18 +292,6 @@ svg {
 .auto-scroll-label {
     font-size: 12px;
 }
-.path-grid {
-    fill: none;
-    stroke: rgba(212, 163, 115, 0.4);
-    stroke-width: 1.5;
-    opacity: 0.6;
-    transition: opacity 0.3s ease;
-}
-
-.path-grid.hidden {
-    opacity: 0;
-}
-
 .debug-text {
     fill: #D4A373;
     opacity: 0.4;

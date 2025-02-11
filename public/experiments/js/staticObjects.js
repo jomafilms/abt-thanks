@@ -2,6 +2,7 @@ export default class StaticObjectManager {
     constructor() {
         this.config = null;
         this.baseMaxSize = this.calculateBaseMaxSize();
+        this.imageCache = new Map();
         
         // Add resize listener
         window.addEventListener('resize', () => {
@@ -22,11 +23,37 @@ export default class StaticObjectManager {
             const response = await fetch('static.json');
             const data = await response.json();
             this.config = data.staticObjects;
+            
+            // Preload SVG files
+            await this.preloadSVGs();
+            
             return true;
         } catch (error) {
             console.error('Error loading static objects configuration:', error);
             return false;
         }
+    }
+
+    async preloadSVGs() {
+        const svgPromises = [];
+        
+        Object.values(this.config.templates).forEach(template => {
+            if (template.image && !this.imageCache.has(template.image)) {
+                console.log('Attempting to load SVG:', template.image);
+                const promise = fetch(`images/${template.image}`)
+                    .then(response => response.text())
+                    .then(svgContent => {
+                        console.log('Successfully loaded SVG:', template.image);
+                        this.imageCache.set(template.image, svgContent);
+                    })
+                    .catch(error => {
+                        console.error('Failed to load SVG:', template.image, error);
+                    });
+                svgPromises.push(promise);
+            }
+        });
+
+        await Promise.all(svgPromises);
     }
 
     renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
@@ -37,16 +64,25 @@ export default class StaticObjectManager {
 
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
-            if (!template) return;
+            if (!template) {
+                console.log('Template not found:', placement.template);
+                return;
+            }
 
             placement.positions.forEach(pos => {
                 // Calculate progress exactly like markers do
                 const t = calculateProgress({ startProgress: pos.progress });
-                if (t < 0 || t > 1) return;
+                if (t < 0 || t > 1) {
+                    console.log('Object out of view range:', placement.template, t);
+                    return;
+                }
 
                 // Find the corresponding line for this object
                 const objectLine = lines.find(line => line.number === pos.line);
-                if (!objectLine || !objectLine.pathEl) return;
+                if (!objectLine || !objectLine.pathEl) {
+                    console.log('Line not found for object:', placement.template, pos.line);
+                    return;
+                }
 
                 // Get the total length of the path and point
                 const totalLength = objectLine.pathEl.getTotalLength();
@@ -91,13 +127,20 @@ export default class StaticObjectManager {
             });
         });
 
+        console.log('Objects to render:', objectsToRender.length);
+
         // Sort objects by progress (t) - lower t values (further away) first
         objectsToRender.sort((a, b) => a.t - b.t);
 
         // Render objects in sorted order
         objectsToRender.forEach(obj => {
-            if (obj.template.type === 'svg' && obj.template.render === 'tree') {
-                this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+            if (obj.template.type === 'svg') {
+                if (obj.template.render === 'tree') {
+                    this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+                } else if (obj.template.render === 'chips' && obj.template.image) {
+                    console.log('Rendering chips:', obj.template.image);
+                    this.renderChips(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+                }
             }
         });
     }
@@ -164,5 +207,44 @@ export default class StaticObjectManager {
 
         group.appendChild(trunk);
         group.appendChild(crown);
+    }
+
+    renderChips(svg, pos, template, placement, size, opacity) {
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute('transform', `translate(${pos.x - size/2},${pos.y - size/2})`);
+        group.setAttribute('class', 'dissolving-object');
+        group.style.opacity = opacity;
+
+        // Get cached SVG content
+        const svgContent = this.imageCache.get(template.image);
+        if (svgContent) {
+            console.log('Found cached SVG content for:', template.image);
+            // Create a temporary div to parse SVG content
+            const div = document.createElement('div');
+            div.innerHTML = svgContent;
+            const svgElement = div.querySelector('svg');
+            
+            if (svgElement) {
+                console.log('Successfully parsed SVG element');
+                // Extract the contents of the SVG
+                const contents = svgElement.innerHTML;
+                
+                // Create a new SVG element with proper sizing
+                const chipsSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                chipsSvg.setAttribute('width', size);
+                chipsSvg.setAttribute('height', size);
+                chipsSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox') || '0 0 100 100');
+                chipsSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                chipsSvg.innerHTML = contents;
+                
+                group.appendChild(chipsSvg);
+            } else {
+                console.error('Failed to parse SVG element from content');
+            }
+        } else {
+            console.error('No cached SVG content found for:', template.image);
+        }
+
+        svg.appendChild(group);
     }
 } 

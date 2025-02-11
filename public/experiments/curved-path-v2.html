@@ -271,8 +271,6 @@
             const lines = [];
             const gridSpacing = BASE_LINE_SPACING;
             for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
-                if (i === 0) continue; // Skip center line as it's our main path
-                
                 const xOffset = i * gridSpacing;
                 const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 let gridD = `M ${VANISHING_POINT_X + xOffset * 0.2} ${HORIZON_Y}`; // Start at horizon with compressed spacing
