@@ -47,10 +47,6 @@ export default class StaticObjectManager {
                     .then(svgContent => {
                         console.log('Successfully loaded SVG:', template.image);
                         this.imageCache.set(template.image, svgContent);
-                        // Once we have the chips SVG, update the pattern
-                        if (template.render === 'chips') {
-                            this.updateChipPattern(svgContent);
-                        }
                     })
                     .catch(error => {
                         console.error('Failed to load SVG:', template.image, error);
@@ -62,180 +58,70 @@ export default class StaticObjectManager {
         await Promise.all(svgPromises);
     }
 
-    updateChipPattern(svgContent) {
-        // Find the main SVG and pattern element
-        const mainSvg = document.getElementById('scene');
-        if (!mainSvg) {
-            console.error('Main SVG element not found');
-            return;
+    renderChipsWithPerspective(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
+        // Find the center line (line 0)
+        const centerLine = lines.find(line => line.number === 0);
+        if (!centerLine) return;
+
+        const chipTemplate = this.config.templates['chip'];
+        if (!chipTemplate || !chipTemplate.image) return;
+
+        const svgContent = this.imageCache.get(chipTemplate.image);
+        if (!svgContent) return;
+
+        // Calculate chip spacing in world units
+        const CHIP_SPACING = 50 * this.OVERLAP_SCALE; // Adjust this value to control density
+        const NUM_CHIPS = 20; // Number of chips to render
+
+        // Create a group for all chips
+        const chipsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        chipsGroup.setAttribute('class', 'dissolving-object');
+
+        // Generate chips along the path
+        for (let i = 0; i < NUM_CHIPS; i++) {
+            const progress = i / NUM_CHIPS;
+            const t = calculateProgress({ startProgress: progress });
+            
+            // Skip if outside visible range
+            if (t < 0 || t > 1) continue;
+
+            // Calculate world position
+            const worldPos = worldCurveAt(t);
+            const perspectivePos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+
+            // Calculate size with perspective
+            const baseSize = this.baseMaxSize * 0.5;
+            const perspectiveScale = 1 - (t * 0.8); // Smaller scale in distance
+            const finalSize = baseSize * perspectiveScale * this.CHIP_SCALE;
+
+            // Create chip SVG
+            const chipGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            chipGroup.setAttribute('transform', `translate(${perspectivePos.x - finalSize/2},${perspectivePos.y - finalSize/2})`);
+
+            // Parse the SVG content
+            const parser = new DOMParser();
+            const chipDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+            const chipSvg = chipDoc.documentElement;
+
+            // Set size
+            chipSvg.setAttribute('width', finalSize);
+            chipSvg.setAttribute('height', finalSize);
+
+            // Add to group
+            chipGroup.appendChild(chipSvg);
+            chipsGroup.appendChild(chipGroup);
         }
 
-        const pattern = mainSvg.querySelector('#chipPattern');
-        if (!pattern) {
-            console.error('Chip pattern element not found in main SVG');
-            return;
-        }
-
-        // Clear any existing content
-        while (pattern.firstChild) {
-            pattern.removeChild(pattern.firstChild);
-        }
-
-        // Parse the SVG content
-        const div = document.createElement('div');
-        div.innerHTML = svgContent;
-        const svgElement = div.querySelector('svg');
-        
-        if (svgElement) {
-            // Extract viewBox and content
-            const viewBox = svgElement.getAttribute('viewBox');
-            console.log('SVG viewBox:', viewBox);
-            
-            // Parse viewBox values
-            const [x, y, width, height] = viewBox.split(' ').map(Number);
-            console.log('Original SVG dimensions - width:', width, 'height:', height);
-            
-            // Calculate aspect ratio
-            const aspectRatio = width / height;
-            console.log('Aspect ratio:', aspectRatio);
-            
-            // Calculate sizes with overlap
-            const baseChipSize = 50;
-            const chipSize = baseChipSize * this.CHIP_SCALE;
-            
-            // Adjust chip dimensions to maintain aspect ratio
-            const chipWidth = chipSize;
-            const chipHeight = chipSize / aspectRatio;
-            console.log('Adjusted chip dimensions - width:', chipWidth, 'height:', chipHeight);
-            
-            // Make pattern smaller than chip size to create overlap
-            const patternWidth = Math.round(chipWidth * this.OVERLAP_SCALE);
-            const patternHeight = Math.round(chipHeight * this.OVERLAP_SCALE);
-            
-            // Update pattern attributes
-            pattern.setAttribute('width', patternWidth.toString());
-            pattern.setAttribute('height', patternHeight.toString());
-            
-            // Background rectangle for path fill
-            const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            bgRect.setAttribute('width', patternWidth.toString());
-            bgRect.setAttribute('height', patternHeight.toString());
-            bgRect.setAttribute('fill', '#D4A373');
-            bgRect.setAttribute('opacity', '0.2');
-            pattern.appendChild(bgRect);
-
-            // Create the chip SVG
-            const chipSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            chipSvg.setAttribute('viewBox', viewBox);
-            chipSvg.setAttribute('width', chipWidth.toString());
-            chipSvg.setAttribute('height', chipHeight.toString());
-            
-            // Center the chip in the pattern
-            chipSvg.setAttribute('x', ((patternWidth - chipWidth) / 2).toString());
-            chipSvg.setAttribute('y', ((patternHeight - chipHeight) / 2).toString());
-            chipSvg.innerHTML = svgElement.innerHTML;
-            
-            pattern.appendChild(chipSvg);
-        } else {
-            console.error('Failed to parse SVG element from content');
-        }
+        svg.appendChild(chipsGroup);
     }
 
     renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
         if (!this.config) return;
 
-        // Ensure we're using the main SVG element
-        const mainSvg = svg.closest('svg') || document.getElementById('scene');
-        if (!mainSvg) {
-            console.error('Main SVG element not found');
-            return;
-        }
+        // Render chips with perspective
+        this.renderChipsWithPerspective(svg, lines, calculateProgress, worldCurveAt, applyPerspective);
 
-        // Clear existing objects before rendering new ones
-        const existingObjects = mainSvg.querySelectorAll('.dissolving-object');
-        existingObjects.forEach(obj => obj.remove());
-
-        // Get the viewport dimensions from the SVG
-        const width = mainSvg.clientWidth;
-        const height = mainSvg.clientHeight;
-        const HORIZON_Y = height * 0.4;
-        const VANISHING_POINT_X = width * 0.5;
-
-        // First verify the SVG structure
-        const defs = mainSvg.querySelector('defs');
-        const mask = defs?.querySelector('#pathMask');
-        const pathArea = mask?.querySelector('.path-area');
-        const staticElements = mainSvg.querySelector('#static-elements');
-        const pathFill = staticElements?.querySelector('.path-fill');
-
-        // Log detailed structure information
-        console.log('SVG Structure Check:', {
-            svgId: mainSvg.id,
-            originalElementId: svg.id,
-            svgChildCount: mainSvg.children.length,
-            defsExists: !!defs,
-            defsChildCount: defs?.children.length,
-            maskExists: !!mask,
-            maskChildCount: mask?.children.length,
-            pathAreaExists: !!pathArea,
-            staticElementsExists: !!staticElements,
-            pathFillExists: !!pathFill,
-            pathAreaClass: pathArea?.getAttribute('class'),
-            pathFillClass: pathFill?.getAttribute('class')
-        });
-        
-        // Update the path mask with the current path shape
-        if (pathArea && pathFill) {
-            // Find the edge lines
-            const leftEdgeLine = lines.find(line => line.number === -2);  // Explicitly look for line -2
-            const rightEdgeLine = lines.find(line => line.number === 2);  // Explicitly look for line 2
-
-            if (leftEdgeLine && rightEdgeLine) {
-                // Create a path that encompasses the area between the edge lines
-                const pathD = `M ${VANISHING_POINT_X} ${HORIZON_Y} ${leftEdgeLine.d.substring(leftEdgeLine.d.indexOf('L'))} L ${rightEdgeLine.d.split('L').reverse().join(' L ')} Z`;
-                
-                // Log the path data being set
-                console.log('Setting path data:', {
-                    pathDLength: pathD.length,
-                    pathDStart: pathD.substring(0, 100) + '...',
-                    leftEdgeExists: !!leftEdgeLine.d,
-                    rightEdgeExists: !!rightEdgeLine.d,
-                    pathAreaBefore: pathArea.getAttribute('d'),
-                    pathFillBefore: pathFill.getAttribute('d')
-                });
-                
-                // Set the path data
-                pathArea.setAttribute('d', pathD);
-                pathFill.setAttribute('d', pathD);
-                
-                console.log('Path data set successfully:', {
-                    pathAreaAfter: pathArea.getAttribute('d')?.length,
-                    pathFillAfter: pathFill.getAttribute('d')?.length
-                });
-            } else {
-                console.warn('Edge lines not found:', { 
-                    leftEdge: leftEdgeLine?.number, 
-                    rightEdge: rightEdgeLine?.number,
-                    totalLines: lines.length,
-                    lineNumbers: lines.map(l => l.number).join(', ')
-                });
-            }
-        } else {
-            console.warn('Path elements not found:', { 
-                svgId: mainSvg.id,
-                originalElementId: svg.id,
-                svgChildCount: mainSvg.children.length,
-                defsExists: !!defs,
-                defsContent: defs?.innerHTML.substring(0, 100) + '...',
-                maskExists: !!mask,
-                pathArea: !!pathArea,
-                pathFill: !!pathFill,
-                staticElementsExists: !!staticElements,
-                fullSvgHtml: mainSvg.outerHTML.substring(0, 200) + '...'
-            });
-        }
-
-        // Use mainSvg for rendering trees
+        // Render other objects (trees, etc.)
         const objectsToRender = [];
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
@@ -292,7 +178,7 @@ export default class StaticObjectManager {
         objectsToRender.sort((a, b) => a.t - b.t);
         objectsToRender.forEach(obj => {
             if (obj.template.type === 'svg' && obj.template.render === 'tree') {
-                this.renderTree(mainSvg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+                this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
             }
         });
     }

@@ -85,21 +85,21 @@
     </div>
 
     <svg id="scene">
+        <!-- Debug elements for visibility testing -->
+        <g id="debug-elements">
+            <rect x="0" y="0" width="100%" height="100%" fill="rgba(255,0,0,0.1)" stroke="red" stroke-width="8"/>
+            <circle cx="50%" cy="40%" r="30" fill="rgba(0,0,255,0.5)"/>
+            <text x="50%" y="50%" text-anchor="middle" fill="red" font-size="24">Debug Elements</text>
+        </g>
+
         <defs>
             <!-- Trail texture pattern -->
-            <pattern id="trailPattern" patternUnits="userSpaceOnUse" width="100" height="8">
+            <pattern id="chipPattern" patternUnits="userSpaceOnUse" width="100" height="8">
                 <rect width="100" height="8" fill="#D4A373" opacity="0.4"/>
                 <filter id="trailNoiseFilter">
                     <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" stitchTiles="stitch"/>
                     <feDisplacementMap in="SourceGraphic" scale="2"/>
                 </filter>
-            </pattern>
-            
-            <!-- Chip pattern - reduced size for denser tiling -->
-            <pattern id="chipPattern" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-                <!-- Debug rectangle to verify pattern is working -->
-                <rect width="100" height="100" fill="#D4A373" opacity="0.2"/>
-                <!-- SVG content will be populated here -->
             </pattern>
             
             <!-- Path mask -->
@@ -111,8 +111,8 @@
         
         <!-- Static elements that should not be cleared -->
         <g id="static-elements">
-            <!-- Filled path with chip pattern (render this first) -->
-            <path class="path-fill" d="" mask="url(#pathMask)" fill="url(#chipPattern)" opacity="0.8"/>
+            <!-- Filled path with base color -->
+            <path class="path-fill" d="" mask="url(#pathMask)" fill="#D4A373" opacity="0.4"/>
         </g>
         
         <!-- Container for dynamic elements (these will be cleared and redrawn) -->
@@ -235,7 +235,7 @@
             buildArcLengthTable();
             
             const steps = 100;
-            let d = '';
+            let pathData = '';
             
             // Get current grid visibility state
             const showGrid = document.getElementById('showGrid').checked;
@@ -415,28 +415,29 @@
             }
             
             // Store points for main path
-            const mainPoints = [];
+            const points = [];
             
             // Generate points for main path
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
                 const pos = curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR);
-                mainPoints.push(pos);
+                points.push(pos);
             }
             
             // Build main path
-            d = `M ${VANISHING_POINT_X},${HORIZON_Y}`;
-            mainPoints.forEach((pos, i) => {
-                if (i > 0) d += ` L ${pos.x},${pos.y}`;
+            pathData = `M ${VANISHING_POINT_X},${HORIZON_Y}`;
+            points.forEach((pos, i) => {
+                if (i > 0) pathData += ` L ${pos.x},${pos.y}`;
             });
             
             // Create and append center path
             const mainPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
             mainPath.setAttribute('class', 'path');
-            mainPath.setAttribute('d', d);
+            mainPath.setAttribute('d', pathData);
             dynamicElements.appendChild(mainPath);
             
             // Add edge paths
+            const edgePaths = [];
             [EDGE_LINE_NUMBERS.left, EDGE_LINE_NUMBERS.right].forEach(edgeNum => {
                 const edgeLine = lines.find(line => line.number === edgeNum);
                 if (!edgeLine) return;
@@ -445,6 +446,7 @@
                 edgePath.setAttribute('d', edgeLine.d);
                 edgePath.setAttribute('class', 'path-edge');
                 dynamicElements.appendChild(edgePath);
+                edgePaths.push(edgeLine.d);
             });
             
             // Add markers
@@ -466,6 +468,41 @@
                 (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
                 (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR)
             );
+
+            // Update path area for mask and fill
+            if (edgePaths.length === 2) {
+                const [leftPath, rightPath] = edgePaths;
+                
+                // Create a closed path that follows the right edge down and left edge up
+                let fillData = rightPath; // Start with right edge path
+                
+                // Add line to bottom of screen
+                const rightPoints = rightPath.split(' ').filter(p => p.includes(','));
+                const lastRightPoint = rightPoints[rightPoints.length - 1];
+                fillData += ` L ${lastRightPoint.split(',')[0]},${height}`; // Bottom right
+                
+                // Get first point of left path
+                const leftPoints = leftPath.split(' ').filter(p => p.includes(','));
+                const firstLeftPoint = leftPoints[0];
+                fillData += ` L ${firstLeftPoint.split(',')[0]},${height}`; // Bottom left
+                
+                // Add reversed left edge path
+                const reversedLeftPoints = leftPoints.reverse();
+                fillData += ' L ' + reversedLeftPoints.join(' L ');
+                
+                fillData += ' Z'; // Close the path
+                
+                // Update both mask and fill paths
+                const pathArea = svg.querySelector('.path-area');
+                if (pathArea) {
+                    pathArea.setAttribute('d', fillData);
+                }
+                
+                const pathFill = svg.querySelector('.path-fill');
+                if (pathFill) {
+                    pathFill.setAttribute('d', fillData);
+                }
+            }
         }
 
         // Initialize controls and managers
