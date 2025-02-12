@@ -3,6 +3,8 @@ export default class StaticObjectManager {
         this.config = null;
         this.baseMaxSize = this.calculateBaseMaxSize();
         this.imageCache = new Map();
+        this.CHIP_SCALE = 2;     // Controls overall chip size
+        this.OVERLAP_SCALE = .9; // Controls pattern overlap (0.7 = 30% overlap, 0.8 = 20% overlap, etc)
         
         // Add resize listener
         window.addEventListener('resize', () => {
@@ -74,8 +76,6 @@ export default class StaticObjectManager {
             return;
         }
 
-        console.log('Updating chip pattern...');
-
         // Clear any existing content
         while (pattern.firstChild) {
             pattern.removeChild(pattern.firstChild);
@@ -89,43 +89,53 @@ export default class StaticObjectManager {
         if (svgElement) {
             // Extract viewBox and content
             const viewBox = svgElement.getAttribute('viewBox');
-            console.log('Original viewBox:', viewBox);
+            console.log('SVG viewBox:', viewBox);
             
-            // Create a background rect for debugging
+            // Parse viewBox values
+            const [x, y, width, height] = viewBox.split(' ').map(Number);
+            console.log('Original SVG dimensions - width:', width, 'height:', height);
+            
+            // Calculate aspect ratio
+            const aspectRatio = width / height;
+            console.log('Aspect ratio:', aspectRatio);
+            
+            // Calculate sizes with overlap
+            const baseChipSize = 50;
+            const chipSize = baseChipSize * this.CHIP_SCALE;
+            
+            // Adjust chip dimensions to maintain aspect ratio
+            const chipWidth = chipSize;
+            const chipHeight = chipSize / aspectRatio;
+            console.log('Adjusted chip dimensions - width:', chipWidth, 'height:', chipHeight);
+            
+            // Make pattern smaller than chip size to create overlap
+            const patternWidth = Math.round(chipWidth * this.OVERLAP_SCALE);
+            const patternHeight = Math.round(chipHeight * this.OVERLAP_SCALE);
+            
+            // Update pattern attributes
+            pattern.setAttribute('width', patternWidth.toString());
+            pattern.setAttribute('height', patternHeight.toString());
+            
+            // Background rectangle for path fill
             const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            bgRect.setAttribute('width', '50');
-            bgRect.setAttribute('height', '50');
+            bgRect.setAttribute('width', patternWidth.toString());
+            bgRect.setAttribute('height', patternHeight.toString());
             bgRect.setAttribute('fill', '#D4A373');
             bgRect.setAttribute('opacity', '0.2');
             pattern.appendChild(bgRect);
 
-            // Create larger, more visible chips
-            const positions = [
-                { x: 10, y: 10, rotate: 0, scale: 1.2 },
-                { x: 35, y: 15, rotate: 45, scale: 1.0 },
-                { x: 15, y: 35, rotate: -30, scale: 1.1 },
-                { x: 40, y: 40, rotate: 15, scale: 0.9 }
-            ];
-
-            // Extract the inner content of the SVG
-            const content = svgElement.innerHTML;
-            console.log('SVG content length:', content.length);
-
-            positions.forEach((pos, index) => {
-                const chipSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                chipSvg.setAttribute('viewBox', viewBox);
-                const size = 30 * pos.scale; // Larger base size
-                chipSvg.setAttribute('width', size.toString());
-                chipSvg.setAttribute('height', size.toString());
-                chipSvg.setAttribute('x', pos.x.toString());
-                chipSvg.setAttribute('y', pos.y.toString());
-                chipSvg.setAttribute('transform', `rotate(${pos.rotate}, ${pos.x + size/2}, ${pos.y + size/2})`);
-                chipSvg.innerHTML = content;
-                pattern.appendChild(chipSvg);
-                console.log(`Added chip ${index + 1} at (${pos.x}, ${pos.y}) with size ${size}`);
-            });
-
-            console.log('Successfully updated chip pattern');
+            // Create the chip SVG
+            const chipSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            chipSvg.setAttribute('viewBox', viewBox);
+            chipSvg.setAttribute('width', chipWidth.toString());
+            chipSvg.setAttribute('height', chipHeight.toString());
+            
+            // Center the chip in the pattern
+            chipSvg.setAttribute('x', ((patternWidth - chipWidth) / 2).toString());
+            chipSvg.setAttribute('y', ((patternHeight - chipHeight) / 2).toString());
+            chipSvg.innerHTML = svgElement.innerHTML;
+            
+            pattern.appendChild(chipSvg);
         } else {
             console.error('Failed to parse SVG element from content');
         }
