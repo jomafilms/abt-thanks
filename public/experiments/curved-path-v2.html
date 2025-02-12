@@ -93,7 +93,7 @@
         <defs>
             <!-- Trail texture pattern -->
             <pattern id="chipPattern" patternUnits="userSpaceOnUse" width="100" height="8">
-                <rect width="100" height="8" fill="#D4A373" opacity="0.4"/>
+                <rect width="100" height="8" fill="#D4A373" opacity="1"/>
                 <filter id="trailNoiseFilter">
                     <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" stitchTiles="stitch"/>
                     <feDisplacementMap in="SourceGraphic" scale="2"/>
@@ -110,7 +110,8 @@
         <!-- Static elements that should not be cleared -->
         <g id="static-elements">
             <!-- Filled path with base color -->
-            <path class="path-fill" d="" mask="url(#pathMask)" fill="#D4A373" opacity="0.4"/>
+            <path class="path-fill" d="" mask="url(#pathMask)" fill="white" opacity="1"/>
+            <path class="path-fill-texture" d="" mask="url(#pathMask)" fill="#D4A373" opacity="0.6"/>
         </g>
         
         <!-- Container for dynamic elements (these will be cleared and redrawn) -->
@@ -494,8 +495,12 @@
                 }
                 
                 const pathFill = svg.querySelector('.path-fill');
+                const pathFillTexture = svg.querySelector('.path-fill-texture');
                 if (pathFill) {
                     pathFill.setAttribute('d', fillData);
+                }
+                if (pathFillTexture) {
+                    pathFillTexture.setAttribute('d', fillData);
                 }
             }
         }
