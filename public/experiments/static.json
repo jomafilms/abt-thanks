@@ -159,11 +159,10 @@
             {
                 "template": "far-hill",
                 "positions": [
-                    {
-                        "progress": 0.5,
-                        "line": -50,
-                        "scale": 2.0
-                    }
+                    { "line": -100, "progress": 0.1, "scale": 4.0 },
+                    { "line": -95, "progress": 0.11, "scale": 4.0 },
+                    { "line": -90, "progress": 0.12, "scale": 4.0 },
+                    { "line": -90, "progress": 0.13, "scale": 4.0 }
                 ]
             }
         ]
