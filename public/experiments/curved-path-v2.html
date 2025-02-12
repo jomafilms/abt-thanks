@@ -75,7 +75,8 @@
             </div>
             <div class="control-group">
                 <label>Show Grid</label>
-                <input type="checkbox" id="showGrid">
+                <input type="checkbox" id="showGrid" checked>
+                <div class="value-display">On</div>
             </div>
             <div class="auto-scroll">
                 <button class="play-button" title="Toggle auto-scroll">
@@ -323,27 +324,38 @@
             // Add vertical grid lines and store line info
             const lines = [];
             const gridSpacing = BASE_LINE_SPACING;
+            
+            // Calculate how many lines we need to cover the entire width plus extra for the edges
+            const screenEdgeToVanishingPoint = Math.max(VANISHING_POINT_X, width - VANISHING_POINT_X);
+            const numLinesNeeded = Math.ceil((screenEdgeToVanishingPoint * 1.5) / (gridSpacing * 0.1)) + 1;
+            NUM_GRID_LINES = Math.max(NUM_GRID_LINES, numLinesNeeded);
+
             for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
                 const xOffset = i * gridSpacing;
                 const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                let gridD = `M ${VANISHING_POINT_X + xOffset * 0.1} ${HORIZON_Y}`; // Start at horizon with compressed spacing
                 
-                // Use fewer steps for grid lines to improve performance
-                const gridSteps = 30;  // Reduced from 100 to 30 steps
-                for (let j = 0; j <= gridSteps; j++) {
+                // Start exactly at vanishing point
+                let gridD = `M ${VANISHING_POINT_X} ${HORIZON_Y}`;
+                
+                // Use more points for smoother curves
+                const gridSteps = 40;
+                for (let j = 1; j <= gridSteps; j++) {
                     const t = j / gridSteps;
                     const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    worldPos.x += xOffset * t; // Scale xOffset by t to create perspective convergence
+                    
+                    // Linear spread from vanishing point
+                    worldPos.x += xOffset * t;
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
-                    gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
+                    
+                    gridD += ` L ${pos.x},${pos.y}`;
                 }
+                
+                // Create the grid path
+                gridPath.setAttribute('d', gridD);
+                gridPath.setAttribute('class', 'path-grid');
                 
                 // Determine if this is within the main path boundaries
                 const isInMainPath = Math.abs(i) < EDGE_LINE_NUMBERS.right;
-                
-                // Always create the grid path
-                gridPath.setAttribute('d', gridD);
-                gridPath.setAttribute('class', 'path-grid');
                 gridPath.style.opacity = isInMainPath ? 0.4 : 0.2;
                 
                 // Only append to SVG if grid is visible
@@ -359,57 +371,6 @@
                     pathEl: gridPath,
                     isInMainPath
                 });
-                
-                // Add line number labels at bottom, tied to paths
-                if (showGrid && i % 5 === 0) {
-                    // Position numbers 10px from bottom of screen
-                    const bottomOffset = 10;
-                    const fixedY = height - bottomOffset;
-                    
-                    // Find where the path intersects with our fixed y-position
-                    let bestT = 0;
-                    let closestDist = Infinity;
-                    const steps = 50;
-                    
-                    // Search for the closest point to our fixed y
-                    for (let j = 0; j <= steps; j++) {
-                        const searchT = j / steps;
-                        const worldPos = worldCurveAt(searchT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                        worldPos.x += xOffset * searchT;
-                        const pos = applyPerspective(worldPos.x, worldPos.y, 1 - searchT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
-                        
-                        const dist = Math.abs(pos.y - fixedY);
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            bestT = searchT;
-                        }
-                    }
-                    
-                    // Get the x-position at the intersection point
-                    const worldPos = worldCurveAt(bestT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    worldPos.x += xOffset * bestT;
-                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - bestT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
-                    
-                    // Add the line number
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute('x', pos.x);
-                    text.setAttribute('y', fixedY);
-                    text.setAttribute('class', 'debug-text');
-                    text.setAttribute('fill', '#D4A373');
-                    text.setAttribute('opacity', '0.4');
-                    text.setAttribute('text-anchor', 'middle');
-                    text.textContent = i.toString();
-                    dynamicElements.appendChild(text);
-                    
-                    // Add a small dot to verify position
-                    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    dot.setAttribute('cx', pos.x);
-                    dot.setAttribute('cy', fixedY);
-                    dot.setAttribute('r', '2');
-                    dot.setAttribute('fill', '#D4A373');
-                    dot.setAttribute('opacity', '0.4');
-                    dynamicElements.appendChild(dot);
-                }
             }
             
             // Store points for main path

@@ -314,7 +314,7 @@ svg {
         #388E3C 60%,   /* Medium forest green in middle */
         #1B5E20 100%   /* Deep forest green at bottom */
     );
-    opacity: 0.6;
+    opacity: 0.3;
 }
 
 .ground-fog {
