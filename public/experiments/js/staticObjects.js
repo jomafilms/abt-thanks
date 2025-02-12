@@ -6,10 +6,21 @@ export default class StaticObjectManager {
         this.CHIP_SCALE = 2;     // Controls overall chip size
         this.OVERLAP_SCALE = .9; // Controls pattern overlap (0.7 = 30% overlap, 0.8 = 20% overlap, etc)
         
+        // Default background config
+        this.backgroundConfig = {
+            maxCurvedLineNumber: 50,
+            farLinesBaseSpeed: 0.95,
+            farLinesSpacing: 1.2
+        };
+        
         // Add resize listener
         window.addEventListener('resize', () => {
             this.baseMaxSize = this.calculateBaseMaxSize();
         });
+    }
+
+    getBackgroundConfig() {
+        return this.backgroundConfig;
     }
 
     calculateBaseMaxSize() {
@@ -25,6 +36,11 @@ export default class StaticObjectManager {
             const response = await fetch('static.json');
             const data = await response.json();
             this.config = data.staticObjects;
+            
+            // Load background config if available
+            if (data.config?.background) {
+                this.backgroundConfig = data.config.background;
+            }
             
             // Preload SVG files
             await this.preloadSVGs();
@@ -130,13 +146,21 @@ export default class StaticObjectManager {
             }
 
             placement.positions.forEach(pos => {
-                // Calculate progress exactly like markers do
-                const t = calculateProgress({ startProgress: pos.progress });
-                if (t < 0 || t > 1) return;
-
                 // Find the corresponding line for this object
                 const objectLine = lines.find(line => line.number === pos.line);
                 if (!objectLine || !objectLine.pathEl) return;
+
+                // Calculate progress differently for straight vs curved lines
+                let t;
+                if (objectLine.isStraight) {
+                    // For straight lines, set speed to 0 for debugging
+                    t = pos.progress; // Static position, no movement
+                } else {
+                    // Normal progress calculation for curved lines
+                    t = calculateProgress({ startProgress: pos.progress });
+                }
+
+                if (t < 0 || t > 1) return;
 
                 // Get the total length of the path and point
                 const totalLength = objectLine.pathEl.getTotalLength();

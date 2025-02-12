@@ -305,57 +305,105 @@
             const lines = [];
             const gridSpacing = BASE_LINE_SPACING;
             
-            // Calculate how many lines we need to cover the entire width plus extra for the edges
+            // Get background config from staticObjectManager
+            const bgConfig = staticObjectManager.getBackgroundConfig();
+            
+            // Calculate how many lines we need
             const screenEdgeToVanishingPoint = Math.max(VANISHING_POINT_X, width - VANISHING_POINT_X);
             const numLinesNeeded = Math.ceil((screenEdgeToVanishingPoint * 1.5) / (gridSpacing * 0.1)) + 1;
-            NUM_GRID_LINES = Math.max(100, numLinesNeeded);  // Set minimum to 100 lines
+            NUM_GRID_LINES = Math.max(100, numLinesNeeded);
 
             // Add debug text for farthest line number
             if (showGrid) {
                 addDebugText(dynamicElements, 10, HORIZON_Y + 20, `Farthest line: ${NUM_GRID_LINES}`);
             }
 
-            for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
+            // First generate all curved lines up to 50
+            for (let i = -bgConfig.maxCurvedLineNumber; i <= bgConfig.maxCurvedLineNumber; i++) {
                 const xOffset = i * gridSpacing;
                 const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 
-                // Start exactly at vanishing point
+                // Start at vanishing point
                 let gridD = `M ${VANISHING_POINT_X} ${HORIZON_Y}`;
                 
-                // Use more points for smoother curves
                 const gridSteps = 40;
                 for (let j = 1; j <= gridSteps; j++) {
                     const t = j / gridSteps;
                     const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    
-                    // Linear spread from vanishing point
                     worldPos.x += xOffset * t;
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
-                    
                     gridD += ` L ${pos.x},${pos.y}`;
                 }
                 
-                // Create the grid path
                 gridPath.setAttribute('d', gridD);
                 gridPath.setAttribute('class', 'path-grid');
                 
-                // Determine if this is within the main path boundaries
                 const isInMainPath = Math.abs(i) < EDGE_LINE_NUMBERS.right;
                 gridPath.style.opacity = isInMainPath ? 0.4 : 0.2;
                 
-                // Only append to SVG if grid is visible
                 if (showGrid) {
                     dynamicElements.appendChild(gridPath);
                 }
                 
-                // Store line info with path element reference and path data
                 lines.push({
                     number: i,
                     xOffset,
                     d: gridD,
                     pathEl: gridPath,
-                    isInMainPath
+                    isInMainPath,
+                    isStraight: false
                 });
+            }
+
+            // Now generate straight lines beyond 50
+            const farLineSpacing = gridSpacing * bgConfig.farLinesSpacing;
+            const leftLine50 = lines.find(l => l.number === -50);
+            const rightLine50 = lines.find(l => l.number === 50);
+
+            if (leftLine50 && rightLine50) {
+                // Get the bottom points of line ±50 to use as reference
+                const getEndPoint = (line) => {
+                    const points = line.d.split(' ').filter(p => p.includes(','));
+                    const lastPoint = points[points.length - 1];
+                    return lastPoint.split(',').map(Number);
+                };
+
+                const [leftX50] = getEndPoint(leftLine50);
+                const [rightX50] = getEndPoint(rightLine50);
+
+                // Generate straight lines from 51 to 100
+                for (let i = bgConfig.maxCurvedLineNumber + 1; i <= NUM_GRID_LINES; i++) {
+                    [-1, 1].forEach(direction => {
+                        const lineNumber = i * direction;
+                        const xOffset = lineNumber * farLineSpacing;
+                        const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        
+                        // Calculate spread based on distance from line 50
+                        const spreadDistance = (i - 50) * farLineSpacing;
+                        const baseX = direction === 1 ? rightX50 : leftX50;
+                        const endX = baseX + (direction * spreadDistance);
+                        
+                        // Create straight path from vanishing point
+                        const gridD = `M ${VANISHING_POINT_X} ${HORIZON_Y} L ${endX} ${height}`;
+                        
+                        gridPath.setAttribute('d', gridD);
+                        gridPath.setAttribute('class', 'path-grid far-grid');
+                        gridPath.style.opacity = 0.1;
+                        
+                        if (showGrid) {
+                            dynamicElements.appendChild(gridPath);
+                        }
+                        
+                        lines.push({
+                            number: lineNumber,
+                            xOffset,
+                            d: gridD,
+                            pathEl: gridPath,
+                            isInMainPath: false,
+                            isStraight: true
+                        });
+                    });
+                }
             }
 
             // Add line numbers after creating all the lines
@@ -363,7 +411,6 @@
                 for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i += 5) {
                     const line = lines.find(l => l.number === i);
                     if (line && line.pathEl) {
-                        // Get point at 25% along the path
                         const totalLength = line.pathEl.getTotalLength();
                         const point = line.pathEl.getPointAtLength(totalLength * 0.25);
                         addDebugText(dynamicElements, point.x, point.y, i.toString());

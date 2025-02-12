@@ -63,6 +63,11 @@
             "defaultHeight": 1.2,
             "cornerRadius": 0.2,
             "fontScale": 0.8
+        },
+        "background": {
+            "maxCurvedLineNumber": 50,
+            "farLinesBaseSpeed": 0.95,
+            "farLinesSpacing": 1.2
         }
     },
     "staticObjects": {
@@ -149,11 +154,7 @@
             {
                 "template": "hill",
                 "positions": [
-                    {
-                        "progress": 0.1,
-                        "line": -30,
-                        "scale": 1.0
-                    }
+                    { "line": -50, "progress": 0.1, "scale": 1.0 }
                 ]
             },
             {
