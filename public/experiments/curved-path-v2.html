@@ -159,9 +159,9 @@
         const PERSPECTIVE_FACTOR = 0.8;
         const DOT_SPACING = 0.3;
         let VIEWPORT_MARGIN = 50;
-        let BASE_LINE_SPACING = width * 0.05;  // 5% of viewport width
+        let BASE_LINE_SPACING = width * 0.1;  // 10% of viewport width - wider spacing
         let horizonRatio = HORIZON_Y / height;
-        let viewportOverflow = 2 + (1 - horizonRatio) * 2;
+        let viewportOverflow = 2;  // Simplified constant value
         let totalWidth = width * viewportOverflow;
         let NUM_GRID_LINES = Math.ceil(totalWidth / BASE_LINE_SPACING);
         const NUM_LATITUDE_LINES = 10;
@@ -326,12 +326,14 @@
             for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
                 const xOffset = i * gridSpacing;
                 const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                let gridD = `M ${VANISHING_POINT_X + xOffset * 0.2} ${HORIZON_Y}`; // Start at horizon with compressed spacing
+                let gridD = `M ${VANISHING_POINT_X + xOffset * 0.1} ${HORIZON_Y}`; // Start at horizon with compressed spacing
                 
-                for (let j = 0; j <= steps; j++) {
-                    const t = j / steps;
+                // Use fewer steps for grid lines to improve performance
+                const gridSteps = 30;  // Reduced from 100 to 30 steps
+                for (let j = 0; j <= gridSteps; j++) {
+                    const t = j / gridSteps;
                     const worldPos = worldCurveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    worldPos.x += xOffset * t;
+                    worldPos.x += xOffset * t; // Scale xOffset by t to create perspective convergence
                     const pos = applyPerspective(worldPos.x, worldPos.y, 1 - t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
                     gridD += ` ${j === 0 ? 'M' : 'L'} ${pos.x},${pos.y}`;
                 }
@@ -614,9 +616,9 @@
             VANISHING_POINT_X = width * 0.5;
             PATH_BASE_AMPLITUDE = width * 0.2;
             VIEWPORT_MARGIN = 50;
-            BASE_LINE_SPACING = width * 0.05;
+            BASE_LINE_SPACING = width * 0.1;  // 10% of viewport width - wider spacing
             horizonRatio = HORIZON_Y / height;
-            viewportOverflow = 2 + (1 - horizonRatio) * 2;
+            viewportOverflow = 2;  // Simplified constant value
             totalWidth = width * viewportOverflow;
             NUM_GRID_LINES = Math.ceil(totalWidth / BASE_LINE_SPACING);
             
