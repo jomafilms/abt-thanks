@@ -257,26 +257,6 @@
             
             // Add latitude lines only if grid is visible
             if (showGrid) {
-                // First, find the t-value at our reference y-position (0.85)
-                const referenceY = height * 0.85;
-                let referenceT = 0;
-                let minDist = Infinity;
-                
-                for (let j = 0; j <= 100; j++) {
-                    const searchT = j / 100;
-                    const worldPos = worldCurveAt(searchT, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X);
-                    const pos = applyPerspective(worldPos.x, worldPos.y, 1 - searchT, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR);
-                    
-                    const dist = Math.abs(pos.y - referenceY);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        referenceT = searchT;
-                    }
-                }
-                
-                // Add a debug label for our reference point
-                addDebugText(dynamicElements, VANISHING_POINT_X - width * 0.45, referenceY, `ref: ${referenceT.toFixed(3)}`);
-
                 // Now add the regular latitude lines
                 for (let i = 0; i <= NUM_LATITUDE_LINES; i++) {
                     const t = i / NUM_LATITUDE_LINES;
@@ -328,7 +308,12 @@
             // Calculate how many lines we need to cover the entire width plus extra for the edges
             const screenEdgeToVanishingPoint = Math.max(VANISHING_POINT_X, width - VANISHING_POINT_X);
             const numLinesNeeded = Math.ceil((screenEdgeToVanishingPoint * 1.5) / (gridSpacing * 0.1)) + 1;
-            NUM_GRID_LINES = Math.max(NUM_GRID_LINES, numLinesNeeded);
+            NUM_GRID_LINES = Math.max(100, numLinesNeeded);  // Set minimum to 100 lines
+
+            // Add debug text for farthest line number
+            if (showGrid) {
+                addDebugText(dynamicElements, 10, HORIZON_Y + 20, `Farthest line: ${NUM_GRID_LINES}`);
+            }
 
             for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i++) {
                 const xOffset = i * gridSpacing;
@@ -371,6 +356,19 @@
                     pathEl: gridPath,
                     isInMainPath
                 });
+            }
+
+            // Add line numbers after creating all the lines
+            if (showGrid) {
+                for (let i = -NUM_GRID_LINES; i <= NUM_GRID_LINES; i += 5) {
+                    const line = lines.find(l => l.number === i);
+                    if (line && line.pathEl) {
+                        // Get point at 25% along the path
+                        const totalLength = line.pathEl.getTotalLength();
+                        const point = line.pathEl.getPointAtLength(totalLength * 0.25);
+                        addDebugText(dynamicElements, point.x, point.y, i.toString());
+                    }
+                }
             }
             
             // Store points for main path
