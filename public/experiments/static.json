@@ -101,6 +101,13 @@
                 "variant": "gentle",
                 "baseColor": "#2E7D32",
                 "scale": 2.0
+            },
+            "far-hill": {
+                "type": "svg",
+                "render": "hill",
+                "variant": "gentle",
+                "baseColor": "#1B5E20",
+                "scale": 3.0
             }
         },
         "placements": [
@@ -146,6 +153,16 @@
                         "progress": 0.1,
                         "line": -30,
                         "scale": 1.0
+                    }
+                ]
+            },
+            {
+                "template": "far-hill",
+                "positions": [
+                    {
+                        "progress": 0.5,
+                        "line": -50,
+                        "scale": 2.0
                     }
                 ]
             }
