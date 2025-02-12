@@ -2,6 +2,9 @@ export default class StaticObjectManager {
     constructor() {
         this.config = null;
         this.baseMaxSize = this.calculateBaseMaxSize();
+        this.imageCache = new Map();
+        this.CHIP_SCALE = 2;     // Controls overall chip size
+        this.OVERLAP_SCALE = .9; // Controls pattern overlap (0.7 = 30% overlap, 0.8 = 20% overlap, etc)
         
         // Add resize listener
         window.addEventListener('resize', () => {
@@ -22,6 +25,10 @@ export default class StaticObjectManager {
             const response = await fetch('static.json');
             const data = await response.json();
             this.config = data.staticObjects;
+            
+            // Preload SVG files
+            await this.preloadSVGs();
+            
             return true;
         } catch (error) {
             console.error('Error loading static objects configuration:', error);
@@ -29,14 +36,96 @@ export default class StaticObjectManager {
         }
     }
 
+    async preloadSVGs() {
+        const svgPromises = [];
+        
+        Object.values(this.config.templates).forEach(template => {
+            if (template.image && !this.imageCache.has(template.image)) {
+                console.log('Attempting to load SVG:', template.image);
+                const promise = fetch(`images/${template.image}`)
+                    .then(response => response.text())
+                    .then(svgContent => {
+                        console.log('Successfully loaded SVG:', template.image);
+                        this.imageCache.set(template.image, svgContent);
+                    })
+                    .catch(error => {
+                        console.error('Failed to load SVG:', template.image, error);
+                    });
+                svgPromises.push(promise);
+            }
+        });
+
+        await Promise.all(svgPromises);
+    }
+
+    renderChipsWithPerspective(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
+        // Find the center line (line 0)
+        const centerLine = lines.find(line => line.number === 0);
+        if (!centerLine) return;
+
+        const chipTemplate = this.config.templates['chip'];
+        if (!chipTemplate || !chipTemplate.image) return;
+
+        const svgContent = this.imageCache.get(chipTemplate.image);
+        if (!svgContent) return;
+
+        // Calculate chip spacing in world units
+        const CHIP_SPACING = 50 * this.OVERLAP_SCALE; // Adjust this value to control density
+        const NUM_CHIPS = 20; // Number of chips to render
+
+        // Create a group for all chips
+        const chipsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        chipsGroup.setAttribute('class', 'dissolving-object');
+
+        // Generate chips along the path
+        for (let i = 0; i < NUM_CHIPS; i++) {
+            const progress = i / NUM_CHIPS;
+            const t = calculateProgress({ startProgress: progress });
+            
+            // Skip if outside visible range
+            if (t < 0 || t > 1) continue;
+
+            // Calculate world position
+            const worldPos = worldCurveAt(t);
+            const perspectivePos = applyPerspective(worldPos.x, worldPos.y, 1 - t);
+
+            // Calculate size with perspective
+            const baseSize = this.baseMaxSize * 0.5;
+            const perspectiveScale = 1 - (t * 0.8); // Smaller scale in distance
+            const finalSize = baseSize * perspectiveScale * this.CHIP_SCALE;
+
+            // Create chip SVG
+            const chipGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            chipGroup.setAttribute('transform', `translate(${perspectivePos.x - finalSize/2},${perspectivePos.y - finalSize/2})`);
+
+            // Parse the SVG content
+            const parser = new DOMParser();
+            const chipDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+            const chipSvg = chipDoc.documentElement;
+
+            // Set size
+            chipSvg.setAttribute('width', finalSize);
+            chipSvg.setAttribute('height', finalSize);
+
+            // Add to group
+            chipGroup.appendChild(chipSvg);
+            chipsGroup.appendChild(chipGroup);
+        }
+
+        svg.appendChild(chipsGroup);
+    }
+
     renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
         if (!this.config) return;
 
-        // Render objects (trees, etc.)
+        // Render chips with perspective
+        this.renderChipsWithPerspective(svg, lines, calculateProgress, worldCurveAt, applyPerspective);
+
+        // Render other objects (trees, etc.)
         const objectsToRender = [];
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
-            if (!template || template.render !== 'tree') {
+            if (!template || template.render === 'chips') {
                 return;
             }
 
@@ -156,5 +245,44 @@ export default class StaticObjectManager {
 
         group.appendChild(trunk);
         group.appendChild(crown);
+    }
+
+    renderChips(svg, pos, template, placement, size, opacity) {
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute('transform', `translate(${pos.x - size/2},${pos.y - size/2})`);
+        group.setAttribute('class', 'dissolving-object');
+        group.style.opacity = opacity;
+
+        // Get cached SVG content
+        const svgContent = this.imageCache.get(template.image);
+        if (svgContent) {
+            console.log('Found cached SVG content for:', template.image);
+            // Create a temporary div to parse SVG content
+            const div = document.createElement('div');
+            div.innerHTML = svgContent;
+            const svgElement = div.querySelector('svg');
+            
+            if (svgElement) {
+                console.log('Successfully parsed SVG element');
+                // Extract the contents of the SVG
+                const contents = svgElement.innerHTML;
+                
+                // Create a new SVG element with proper sizing
+                const chipsSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                chipsSvg.setAttribute('width', size);
+                chipsSvg.setAttribute('height', size);
+                chipsSvg.setAttribute('viewBox', svgElement.getAttribute('viewBox') || '0 0 100 100');
+                chipsSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                chipsSvg.innerHTML = contents;
+                
+                group.appendChild(chipsSvg);
+            } else {
+                console.error('Failed to parse SVG element from content');
+            }
+        } else {
+            console.error('No cached SVG content found for:', template.image);
+        }
+
+        svg.appendChild(group);
     }
 } 
