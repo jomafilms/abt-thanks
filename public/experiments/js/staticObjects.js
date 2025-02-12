@@ -121,7 +121,7 @@ export default class StaticObjectManager {
         // Render chips with perspective
         this.renderChipsWithPerspective(svg, lines, calculateProgress, worldCurveAt, applyPerspective);
 
-        // Render other objects (trees, etc.)
+        // Render other objects (trees, hills, etc.)
         const objectsToRender = [];
         this.config.placements.forEach(placement => {
             const template = this.config.templates[placement.template];
@@ -177,8 +177,12 @@ export default class StaticObjectManager {
         // Sort and render objects
         objectsToRender.sort((a, b) => a.t - b.t);
         objectsToRender.forEach(obj => {
-            if (obj.template.type === 'svg' && obj.template.render === 'tree') {
-                this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+            if (obj.template.type === 'svg') {
+                if (obj.template.render === 'tree') {
+                    this.renderTree(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+                } else if (obj.template.render === 'hill') {
+                    this.renderHill(svg, obj.point, obj.template, obj.placement, obj.currentSize, obj.opacity);
+                }
             }
         });
     }
@@ -284,5 +288,37 @@ export default class StaticObjectManager {
         }
 
         svg.appendChild(group);
+    }
+
+    renderHill(svg, pos, template, placement, size, opacity) {
+        // Create hill group with exact position
+        const hillGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        hillGroup.setAttribute('transform', `translate(${pos.x - size},${pos.y - size/2})`);
+        hillGroup.setAttribute('class', 'dissolving-object');
+        hillGroup.style.opacity = opacity;
+
+        // Create the hill path
+        const hill = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        
+        // Generate a gentle hill curve
+        const width = size * 2;  // Make hill wider than it is tall
+        const height = size * 0.6;  // Control hill height
+        let d = `M 0,${size/2}`;  // Start at base
+        
+        // Add curve points
+        for (let x = 0; x <= width; x += width/20) {
+            const progress = x / width;
+            const y = size/2 - height * Math.sin(progress * Math.PI);
+            d += ` L ${x},${y}`;
+        }
+        
+        // Close the path
+        d += ` L ${width},${size/2} Z`;
+        
+        hill.setAttribute('d', d);
+        hill.setAttribute('fill', template.baseColor);
+        
+        hillGroup.appendChild(hill);
+        svg.appendChild(hillGroup);
     }
 } 

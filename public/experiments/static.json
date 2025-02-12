@@ -94,6 +94,13 @@
                 "image": "chips.svg",
                 "baseSize": "small",
                 "scale": 0.5
+            },
+            "hill": {
+                "type": "svg",
+                "render": "hill",
+                "variant": "gentle",
+                "baseColor": "#2E7D32",
+                "scale": 2.0
             }
         },
         "placements": [
@@ -131,6 +138,16 @@
                     { "line": 0, "progress": 0.65, "scale": 5.0 }
                 ],
                 "size": "small"
+            },
+            {
+                "template": "hill",
+                "positions": [
+                    {
+                        "progress": 0.1,
+                        "line": -30,
+                        "scale": 1.0
+                    }
+                ]
             }
         ]
     }
