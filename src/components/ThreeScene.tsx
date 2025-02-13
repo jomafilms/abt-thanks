@@ -31,9 +31,9 @@ export default function ThreeScene() {
             0.1,
             1000
         );
-        // Position camera higher and angle it down
-        camera.position.set(0, 4, 5);
-        camera.rotation.x = -0.5; // Angle camera down
+        // Position camera lower and adjust angle
+        camera.position.set(0, 2, 5); // Lowered Y position
+        camera.rotation.x = -0.3; // Adjusted angle to look slightly upwards
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
