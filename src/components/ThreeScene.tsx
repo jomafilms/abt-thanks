@@ -68,6 +68,19 @@ export default function ThreeScene() {
         createDotLine(-90);
         createDotLine(-180);
 
+        // Add a test object (future tree position)
+        const createTestObject = () => {
+            const geometry = new THREE.SphereGeometry(0.3); // Larger than path dots
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // Green to distinguish it
+            const testObject = new THREE.Mesh(geometry, material);
+            // Position it to the left (-x) and slightly higher than our path
+            testObject.position.set(-4, -1.5, -40);
+            return testObject;
+        };
+
+        const testObject = createTestObject();
+        scene.add(testObject);
+
         // Function to update dot scale based on distance from camera
         const updateDotScale = (dot: THREE.Mesh) => {
             const distanceFromCamera = Math.abs(dot.position.z - camera.position.z);
@@ -83,6 +96,9 @@ export default function ThreeScene() {
             dotsGroup.children.forEach(dot => {
                 updateDotScale(dot as THREE.Mesh);
             });
+            
+            // Update test object scale
+            updateDotScale(testObject);
 
             renderer.render(scene, camera);
         };
@@ -111,12 +127,12 @@ export default function ThreeScene() {
             const deltaY = window.scrollY - lastScrollY;
             lastScrollY = window.scrollY;
             
-            // Move camera (negative deltaY for reversed direction)
+            // Move camera
             cameraZ -= deltaY * 0.01;
             camera.position.z = cameraZ;
             camera.position.y = 4;
 
-            // Update dot positions with larger loop distance
+            // Update dot positions
             dotsGroup.children.forEach(dot => {
                 if (dot.position.z > camera.position.z + 90) {
                     dot.position.z -= 270;
@@ -124,6 +140,13 @@ export default function ThreeScene() {
                     dot.position.z += 270;
                 }
             });
+
+            // Update test object position
+            if (testObject.position.z > camera.position.z + 90) {
+                testObject.position.z -= 270;
+            } else if (testObject.position.z < camera.position.z - 90) {
+                testObject.position.z += 270;
+            }
         };
 
         animate();
