@@ -229,11 +229,16 @@
             const finalY = Math.max(vpY + bounceOffset, height * 0.2);
             const perspectiveScale = 0.3;
 
-            // Calculate viewport overflow based on horizon position
+            // Define the percentage of the area below the horizon where lines should exit
+            const lineExitPercentage = 25; // 100% of the area below the horizon
+
+            // Calculate viewport overflow based on the desired line exit point
             const horizonRatio = vpY / height;
-            const viewportOverflow = 2 + (1 - horizonRatio) * 2;
+            const viewportOverflow = 1 + lineExitPercentage * horizonRatio; // Use horizonRatio directly
+
+            // Calculate total width and number of lines
             const totalWidth = width * viewportOverflow;
-            const BASE_LINE_SPACING = width * 0.05;
+            const BASE_LINE_SPACING = width * 0.05; // Keep this constant or adjust as needed
             const numTotalLines = Math.ceil(totalWidth / BASE_LINE_SPACING);
             
             // Calculate start position to center the lines
@@ -251,10 +256,8 @@
 
             // Calculate perspective adjustment based on distance from center
             function adjustPerspective(xOffset) {
-                // Calculate perspective scale based on distance from center
-                const distanceRatio = Math.abs(xOffset) / (width/2);
-                // Use horizonRatio to adjust perspective intensity
-                const perspectiveIntensity = 0.3 + (1 - horizonRatio) * 0.3;
+                const distanceRatio = Math.abs(xOffset) / (width / 2);
+                const perspectiveIntensity = 0.2 + (1 - horizonRatio) * 1; // Reduce intensity
                 return perspectiveScale * (1 + distanceRatio * perspectiveIntensity);
             }
 
