@@ -56,7 +56,6 @@ export default function ThreeScene() {
         // Constants for smoother looping
         const LOOP_DISTANCE = 270;  // Total loop distance
         const LOOP_TRIGGER = 100;   // Distance from camera to trigger loop
-        const SECTION_OVERLAP = 10; // Overlap between sections
 
         // Create a line of dots
         const createDotLine = (startZ: number) => {
@@ -69,8 +68,8 @@ export default function ThreeScene() {
             }
         };
 
-        // Create three sections of dot lines with overlap
-        createDotLine(SECTION_OVERLAP);
+        // Create three sections of dot lines without overlap
+        createDotLine(0);
         createDotLine(-LOOP_DISTANCE/3);
         createDotLine(-LOOP_DISTANCE * 2/3);
 
@@ -123,18 +122,20 @@ export default function ThreeScene() {
             const scale = Math.max(0.6, 1 / (1 + distanceFromCamera * 0.01));
             dot.scale.set(scale, scale, scale);
 
-            // Add fade-in effect
+            // Add fade-in effect with consistent opacity at loop point
+            const maxDistance = LOOP_DISTANCE / 2; // Define a maximum distance for opacity calculation
+            const normalizedDistance = Math.min(distanceFromCamera, maxDistance);
             const material = dot.material as THREE.MeshBasicMaterial;
-            material.opacity = Math.min(1, 1 / (1 + distanceFromCamera * 0.05));
+            material.opacity = Math.min(1, 1 / (1 + normalizedDistance * 0.05));
             material.transparent = true;
         };
 
         // Function to handle object looping
         const updateObjectPosition = (obj: THREE.Object3D) => {
             if (obj.position.z > camera.position.z + LOOP_TRIGGER) {
-                obj.position.z -= LOOP_DISTANCE + SECTION_OVERLAP;
+                obj.position.z -= LOOP_DISTANCE;
             } else if (obj.position.z < camera.position.z - LOOP_TRIGGER) {
-                obj.position.z += LOOP_DISTANCE + SECTION_OVERLAP;
+                obj.position.z += LOOP_DISTANCE;
             }
         };
 
