@@ -74,6 +74,10 @@ export default function ThreeScene() {
         createDotLine(-LOOP_DISTANCE/3);
         createDotLine(-LOOP_DISTANCE * 2/3);
 
+        // Create a group for test objects
+        const testObjectsGroup = new THREE.Group();
+        scene.add(testObjectsGroup);
+
         // Add a test object (future tree position)
         const createTestObject = () => {
             const geometry = new THREE.SphereGeometry(0.3);
@@ -104,12 +108,13 @@ export default function ThreeScene() {
             return extremeObject;
         };
 
+        // Add test objects to the group
         const testObject = createTestObject();
         const distantObject = createDistantObject();
         const extremeDistantObject = createExtremeDistantObject();
-        scene.add(testObject);
-        scene.add(distantObject);
-        scene.add(extremeDistantObject);
+        testObjectsGroup.add(testObject);
+        testObjectsGroup.add(distantObject);
+        testObjectsGroup.add(extremeDistantObject);
 
         // Function to update dot scale based on distance from camera
         const updateDotScale = (dot: THREE.Mesh) => {
@@ -143,14 +148,14 @@ export default function ThreeScene() {
             });
             
             // Update test objects scale
-            updateDotScale(testObject);
-            updateDotScale(distantObject);
-            updateDotScale(extremeDistantObject);
+            testObjectsGroup.children.forEach(child => {
+                updateDotScale(child as THREE.Mesh);
+            });
 
             renderer.render(scene, camera);
         };
 
-        // Handle window resize
+        // Efficiently manage event listeners
         const handleResize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -180,9 +185,7 @@ export default function ThreeScene() {
 
             // Update all object positions
             dotsGroup.children.forEach(updateObjectPosition);
-            updateObjectPosition(testObject);
-            updateObjectPosition(distantObject);
-            updateObjectPosition(extremeDistantObject);
+            testObjectsGroup.children.forEach(updateObjectPosition);
         };
 
         animate();
