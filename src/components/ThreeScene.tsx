@@ -189,6 +189,18 @@ export default function ThreeScene() {
             testObjectsGroup.children.forEach(updateObjectPosition);
         };
 
+        // Initialize camera position based on scroll
+        let initialScrollY = window.scrollY;
+        let initialCameraZ = 5 - (initialScrollY * 0.01);
+        camera.position.z = initialCameraZ;
+
+        // Adjust initial object positions
+        const adjustInitialPositions = () => {
+            dotsGroup.children.forEach(updateObjectPosition);
+            testObjectsGroup.children.forEach(updateObjectPosition);
+        };
+        adjustInitialPositions();
+
         animate();
 
         window.addEventListener('resize', handleResize);
