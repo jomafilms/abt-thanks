@@ -379,7 +379,10 @@
                         const gridPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                         
                         // Calculate spread based on distance from line 50
-                        const spreadDistance = (i - 50) * farLineSpacing;
+                        const distanceFromLine50 = i - 50;
+                        // Use exponential spread to make lines spread out more as they get further
+                        const spreadFactor = Math.pow(distanceFromLine50 / 50, 1.5); // Increase power for more aggressive spread
+                        const spreadDistance = spreadFactor * farLineSpacing * distanceFromLine50 * 2; // Double the spread
                         const baseX = direction === 1 ? rightX50 : leftX50;
                         const endX = baseX + (direction * spreadDistance);
                         
@@ -470,7 +473,10 @@
                 lines,
                 calculateMarkerProgress,
                 (t) => curveAt(t, width, height, HORIZON_Y, controls.getValues(), scrollWorldDistance / arcTable[arcTable.length - 1].dist, VIEWPORT_MARGIN, VANISHING_POINT_X, bounceOffset, PERSPECTIVE_FACTOR),
-                (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR)
+                (x, y, t) => applyPerspective(x, y, t, VANISHING_POINT_X, HORIZON_Y, bounceOffset, PERSPECTIVE_FACTOR),
+                HORIZON_Y,
+                VANISHING_POINT_X,
+                BASE_LINE_SPACING
             );
 
             // Update path area for mask and fill

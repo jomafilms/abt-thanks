@@ -131,7 +131,7 @@ export default class StaticObjectManager {
         svg.appendChild(chipsGroup);
     }
 
-    renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective) {
+    renderObjects(svg, lines, calculateProgress, worldCurveAt, applyPerspective, HORIZON_Y, VANISHING_POINT_X, BASE_LINE_SPACING) {
         if (!this.config) return;
 
         // Render chips with perspective
@@ -153,8 +153,37 @@ export default class StaticObjectManager {
                 // Calculate progress differently for straight vs curved lines
                 let t;
                 if (objectLine.isStraight) {
-                    // For straight lines, set speed to 0 for debugging
-                    t = pos.progress; // Static position, no movement
+                    // For straight lines, calculate point based on progress along the line
+                    const totalLength = objectLine.pathEl.getTotalLength();
+                    
+                    // Add movement by offsetting progress based on scroll
+                    const scrollOffset = calculateProgress({ startProgress: 0 });
+                    let rawT = (pos.progress + (scrollOffset.t || 0) * this.backgroundConfig.farLinesBaseSpeed);
+                    
+                    // Loop the progress when it goes beyond 1.5 (giving room to go off screen)
+                    t = rawT % 1.5;
+                    
+                    // Get point along the straight line path
+                    const point = objectLine.pathEl.getPointAtLength(totalLength * t);
+                    
+                    // Calculate growth based on progress
+                    const growthProgress = Math.min(t / 0.8, 1);
+                    const baseScale = placement.scale || template.scale || 1;
+                    const distanceScale = Math.max(0.5, 1 - (Math.abs(pos.line) - 50) / 100);
+                    const currentSize = this.baseMaxSize * baseScale * distanceScale * growthProgress;
+                    
+                    // Fade out as they go off screen (after t > 1)
+                    const opacity = t > 1 ? Math.max(0, 1 - (t - 1) * 2) : 1;
+                    
+                    objectsToRender.push({
+                        t,
+                        point,
+                        template,
+                        placement,
+                        currentSize,
+                        opacity
+                    });
+                    return; // Skip the rest of the processing for curved lines
                 } else {
                     // Normal progress calculation for curved lines
                     t = calculateProgress({ startProgress: pos.progress });
