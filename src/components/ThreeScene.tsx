@@ -70,16 +70,38 @@ export default function ThreeScene() {
 
         // Add a test object (future tree position)
         const createTestObject = () => {
-            const geometry = new THREE.SphereGeometry(0.3); // Larger than path dots
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // Green to distinguish it
+            const geometry = new THREE.SphereGeometry(0.3);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
             const testObject = new THREE.Mesh(geometry, material);
-            // Position it to the left (-x) and slightly higher than our path
             testObject.position.set(-4, -1.5, -40);
             return testObject;
         };
 
+        // Add a distant test object
+        const createDistantObject = () => {
+            const geometry = new THREE.SphereGeometry(1);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const distantObject = new THREE.Mesh(geometry, material);
+            distantObject.position.set(-20, -2, -150);
+            return distantObject;
+        };
+
+        // Add an extremely distant object
+        const createExtremeDistantObject = () => {
+            const geometry = new THREE.SphereGeometry(3); // Much bigger to be visible
+            const material = new THREE.MeshBasicMaterial({ color: 0x0000ff }); // Blue to distinguish
+            const extremeObject = new THREE.Mesh(geometry, material);
+            // Position it very far away (-300), very far to the left (-40), and higher up
+            extremeObject.position.set(-40, -1, -300);
+            return extremeObject;
+        };
+
         const testObject = createTestObject();
+        const distantObject = createDistantObject();
+        const extremeDistantObject = createExtremeDistantObject();
         scene.add(testObject);
+        scene.add(distantObject);
+        scene.add(extremeDistantObject);
 
         // Function to update dot scale based on distance from camera
         const updateDotScale = (dot: THREE.Mesh) => {
@@ -97,8 +119,10 @@ export default function ThreeScene() {
                 updateDotScale(dot as THREE.Mesh);
             });
             
-            // Update test object scale
+            // Update test objects scale
             updateDotScale(testObject);
+            updateDotScale(distantObject);
+            updateDotScale(extremeDistantObject);
 
             renderer.render(scene, camera);
         };
@@ -141,11 +165,23 @@ export default function ThreeScene() {
                 }
             });
 
-            // Update test object position
+            // Update test object positions
             if (testObject.position.z > camera.position.z + 90) {
                 testObject.position.z -= 270;
             } else if (testObject.position.z < camera.position.z - 90) {
                 testObject.position.z += 270;
+            }
+
+            if (distantObject.position.z > camera.position.z + 90) {
+                distantObject.position.z -= 270;
+            } else if (distantObject.position.z < camera.position.z - 90) {
+                distantObject.position.z += 270;
+            }
+
+            if (extremeDistantObject.position.z > camera.position.z + 90) {
+                extremeDistantObject.position.z -= 270;
+            } else if (extremeDistantObject.position.z < camera.position.z - 90) {
+                extremeDistantObject.position.z += 270;
             }
         };
 
