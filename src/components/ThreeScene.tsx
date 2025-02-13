@@ -35,7 +35,7 @@ export default function ThreeScene() {
         camera.position.set(0, 4, 5);
         camera.rotation.x = -0.5; // Angle camera down
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         containerRef.current.appendChild(renderer.domElement);
 
@@ -45,16 +45,22 @@ export default function ThreeScene() {
 
         // Create a simple dot
         const createDot = (z: number) => {
-            const geometry = new THREE.SphereGeometry(0.1); // Base size, will scale dynamically
-            const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const geometry = new THREE.SphereGeometry(0.1);
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: true });
             const dot = new THREE.Mesh(geometry, material);
             dot.position.set(0, -2, z);
+            dot.frustumCulled = false; // Prevent disappearing at screen edges
             return dot;
         };
 
+        // Constants for smoother looping
+        const LOOP_DISTANCE = 270;  // Total loop distance
+        const LOOP_TRIGGER = 100;   // Distance from camera to trigger loop
+        const SECTION_OVERLAP = 10; // Overlap between sections
+
         // Create a line of dots
         const createDotLine = (startZ: number) => {
-            const NUM_DOTS = 30;
+            const NUM_DOTS = 35; // More dots for smoother transitions
             const SPACING = 3;
             
             for (let i = 0; i < NUM_DOTS; i++) {
@@ -63,36 +69,38 @@ export default function ThreeScene() {
             }
         };
 
-        // Create three sections of dot lines
-        createDotLine(0);
-        createDotLine(-90);
-        createDotLine(-180);
+        // Create three sections of dot lines with overlap
+        createDotLine(SECTION_OVERLAP);
+        createDotLine(-LOOP_DISTANCE/3);
+        createDotLine(-LOOP_DISTANCE * 2/3);
 
         // Add a test object (future tree position)
         const createTestObject = () => {
             const geometry = new THREE.SphereGeometry(0.3);
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: true });
             const testObject = new THREE.Mesh(geometry, material);
             testObject.position.set(-4, -1.5, -40);
+            testObject.frustumCulled = false;
             return testObject;
         };
 
         // Add a distant test object
         const createDistantObject = () => {
-            const geometry = new THREE.SphereGeometry(1);
-            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const geometry = new THREE.SphereGeometry(2);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: true });
             const distantObject = new THREE.Mesh(geometry, material);
             distantObject.position.set(-20, -2, -150);
+            distantObject.frustumCulled = false;
             return distantObject;
         };
 
         // Add an extremely distant object
         const createExtremeDistantObject = () => {
-            const geometry = new THREE.SphereGeometry(3); // Much bigger to be visible
-            const material = new THREE.MeshBasicMaterial({ color: 0x0000ff }); // Blue to distinguish
+            const geometry = new THREE.SphereGeometry(4);
+            const material = new THREE.MeshBasicMaterial({ color: 0x0000ff, depthTest: true, transparent: true, opacity: 0 });
             const extremeObject = new THREE.Mesh(geometry, material);
-            // Position it very far away (-300), very far to the left (-40), and higher up
-            extremeObject.position.set(-40, -1, -300);
+            extremeObject.position.set(-40, -1, -350);
+            extremeObject.frustumCulled = false;
             return extremeObject;
         };
 
@@ -106,8 +114,23 @@ export default function ThreeScene() {
         // Function to update dot scale based on distance from camera
         const updateDotScale = (dot: THREE.Mesh) => {
             const distanceFromCamera = Math.abs(dot.position.z - camera.position.z);
-            const scale = Math.max(0.2, 1 - (distanceFromCamera * 0.02));
+            // Further increased minimum scale
+            const scale = Math.max(0.6, 1 / (1 + distanceFromCamera * 0.01));
             dot.scale.set(scale, scale, scale);
+
+            // Add fade-in effect
+            const material = dot.material as THREE.MeshBasicMaterial;
+            material.opacity = Math.min(1, 1 / (1 + distanceFromCamera * 0.05));
+            material.transparent = true;
+        };
+
+        // Function to handle object looping
+        const updateObjectPosition = (obj: THREE.Object3D) => {
+            if (obj.position.z > camera.position.z + LOOP_TRIGGER) {
+                obj.position.z -= LOOP_DISTANCE + SECTION_OVERLAP;
+            } else if (obj.position.z < camera.position.z - LOOP_TRIGGER) {
+                obj.position.z += LOOP_DISTANCE + SECTION_OVERLAP;
+            }
         };
 
         // Animation loop with dot scaling
@@ -137,11 +160,10 @@ export default function ThreeScene() {
         let lastScrollY = window.scrollY;
         let cameraZ = 5;
 
-        // Super simple scroll handling
+        // Handle scroll
         const handleScroll = () => {
             const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
             
-            // Reset scroll position when reaching bounds
             if (window.scrollY > maxScroll * 0.8 || window.scrollY < maxScroll * 0.2) {
                 window.scrollTo(0, maxScroll * 0.5);
                 lastScrollY = maxScroll * 0.5;
@@ -156,33 +178,11 @@ export default function ThreeScene() {
             camera.position.z = cameraZ;
             camera.position.y = 4;
 
-            // Update dot positions
-            dotsGroup.children.forEach(dot => {
-                if (dot.position.z > camera.position.z + 90) {
-                    dot.position.z -= 270;
-                } else if (dot.position.z < camera.position.z - 90) {
-                    dot.position.z += 270;
-                }
-            });
-
-            // Update test object positions
-            if (testObject.position.z > camera.position.z + 90) {
-                testObject.position.z -= 270;
-            } else if (testObject.position.z < camera.position.z - 90) {
-                testObject.position.z += 270;
-            }
-
-            if (distantObject.position.z > camera.position.z + 90) {
-                distantObject.position.z -= 270;
-            } else if (distantObject.position.z < camera.position.z - 90) {
-                distantObject.position.z += 270;
-            }
-
-            if (extremeDistantObject.position.z > camera.position.z + 90) {
-                extremeDistantObject.position.z -= 270;
-            } else if (extremeDistantObject.position.z < camera.position.z - 90) {
-                extremeDistantObject.position.z += 270;
-            }
+            // Update all object positions
+            dotsGroup.children.forEach(updateObjectPosition);
+            updateObjectPosition(testObject);
+            updateObjectPosition(distantObject);
+            updateObjectPosition(extremeDistantObject);
         };
 
         animate();
